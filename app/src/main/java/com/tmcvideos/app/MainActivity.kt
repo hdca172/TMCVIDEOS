@@ -320,7 +320,7 @@ private fun readChannels(m3u: String): List<Channel> {
         when {
             line.startsWith("#EXTINF", true) -> {
                 name = line.substringAfterLast(',', "Canal").trim().ifBlank { "Canal" }
-                group = Regex("group-title=\"([^\"]+)\"", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1) ?: "General"
+                group = Regex("group-title=\\\"([^\\\"]+)\\\"", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1) ?: "General"
             }
             !line.startsWith("#") && (line.startsWith("https://") || line.startsWith("http://")) -> {
                 if (output.size < 5000) output.add(Channel(name, line, group))
