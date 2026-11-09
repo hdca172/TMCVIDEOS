@@ -320,7 +320,7 @@ private fun readChannels(m3u: String): List<Channel> {
         when {
             line.startsWith("#EXTINF", true) -> {
                 name = line.substringAfterLast(',', "Canal").trim().ifBlank { "Canal" }
-                group = Regex("group-title=[\\\"]([^\\\"]+)[\\\"]", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1) ?: "General"
+                group = Regex("group-title=\"([^\"]+)\"", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1) ?: "General"
             }
             !line.startsWith("#") && (line.startsWith("https://") || line.startsWith("http://")) -> {
                 if (output.size < 5000) output.add(Channel(name, line, group))
@@ -359,7 +359,7 @@ private fun downloadPlaylist(raw: String): String {
         connection.getInputStream().bufferedReader(Charsets.UTF_8).use { reader ->
             val content = reader.readText()
             require(content.length <= 10_000_000) { "La lista supera el límite de 10 MB" }
-            content.removePrefix("\\uFEFF")
+            content.removePrefix("\uFEFF")
         }
     } finally { (connection as? HttpURLConnection)?.disconnect() }
 }
