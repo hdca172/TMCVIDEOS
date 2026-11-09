@@ -45,6 +45,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.common.AudioAttributes
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -77,6 +78,8 @@ class MainActivity : ComponentActivity() {
 private fun TmcApp(activity: MainActivity) {
     val prefs = remember { activity.getSharedPreferences("tmcvideos", 0) }
     var screen by remember { mutableStateOf("Inicio") }
+    var showWelcome by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) { delay(1700); showWelcome = false }
     var previousScreen by remember { mutableStateOf("TV en vivo") }
     var channels by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var libraryLoaded by remember { mutableStateOf(false) }
@@ -179,7 +182,11 @@ private fun TmcApp(activity: MainActivity) {
         if (screen == "Inicio") showExitConfirmation = true
         else screen = if (screen == "Reproductor") previousScreen.takeUnless { it == "Reproductor" } ?: "TV en vivo" else "Inicio"
     }
-    BackHandler { if (showMenu) showMenu = false else navigateBack() }
+    BackHandler { if (showWelcome) showWelcome = false else if (showMenu) showMenu = false else navigateBack() }
+    if (showWelcome) {
+        WelcomeScreen { showWelcome = false }
+        return
+    }
     Column(Modifier.fillMaxSize().background(Back)) {
         TmcHeader(screen, onBack = { navigateBack() }, onMenu = { showMenu = true }, onSearch = { screen = "Explorar" })
         Box(Modifier.weight(1f)) {
@@ -508,18 +515,54 @@ private fun TmcApp(activity: MainActivity) {
     }
 }
 
+@Composable private fun TmcLogo(size: androidx.compose.ui.unit.Dp) {
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize().padding(top = size * .16f)) {
+            drawCircle(brush = Brush.sweepGradient(listOf(Color(0xFF8A0017), Red, Color(0xFFFF6A17), Gold, Red)), style = Stroke(width = size.toPx() * .12f))
+        }
+        Icon(Icons.Default.PlayArrow, "TMCVIDEOS", tint = White, modifier = Modifier.size(size * .66f))
+        Text("♛", color = Gold, fontSize = (size.value * .43f).sp,
+            modifier = Modifier.align(Alignment.TopCenter).offset(y = -(size * .22f)))
+    }
+}
+@Composable private fun WelcomeScreen(onContinue: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF03030B), Color(0xFF0C0630), Color(0xFF03030B))))
+        .clickable { onContinue() }) {
+        Canvas(Modifier.fillMaxSize()) {
+            drawCircle(brush = Brush.radialGradient(listOf(Blue.copy(alpha = .42f), Color.Transparent)),
+                radius = size.width * .7f, center = androidx.compose.ui.geometry.Offset(size.width * .8f, size.height * .7f))
+            drawCircle(brush = Brush.radialGradient(listOf(Purple.copy(alpha = .4f), Color.Transparent)),
+                radius = size.width * .55f, center = androidx.compose.ui.geometry.Offset(0f, size.height * .56f))
+        }
+        Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            TmcLogo(185.dp)
+            Spacer(Modifier.height(22.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("TMC", color = White, fontWeight = FontWeight.Black, fontSize = 42.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                Text("VIDEOS", color = Red, fontWeight = FontWeight.Black, fontSize = 42.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Todo en Videos\nen un Solo Lugar", color = White, fontSize = 22.sp,
+                lineHeight = 27.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+            Spacer(Modifier.height(55.dp))
+            LinearProgressIndicator(modifier = Modifier.width(190.dp), color = Red,
+                trackColor = Color(0xFF27315B))
+            Spacer(Modifier.height(12.dp))
+            Text("Cargando...", color = White, fontSize = 16.sp)
+        }
+        Text("TMCVIDEOS · Android", modifier = Modifier.align(Alignment.BottomCenter).padding(26.dp),
+            color = Color.LightGray, fontSize = 12.sp)
+    }
+}
 @Composable private fun TmcHeader(screen: String, onBack: () -> Unit, onMenu: () -> Unit, onSearch: () -> Unit) {
     Row(Modifier.fillMaxWidth().background(Color.Black).padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = if (screen == "Inicio") onMenu else onBack) {
             Icon(if (screen == "Inicio") Icons.Default.Menu else Icons.Default.ArrowBack, if (screen == "Inicio") "Menú" else "Volver", tint = White)
         }
-        Box(Modifier.size(45.dp), contentAlignment = Alignment.BottomCenter) {
-            Canvas(Modifier.size(38.dp).align(Alignment.BottomCenter)) {
-                drawCircle(brush = Brush.sweepGradient(listOf(Red, Gold, Red, Color(0xFF9B001E), Red)), style = Stroke(width = 6.dp.toPx()))
-            }
-            Icon(Icons.Default.PlayArrow, "TMCVIDEOS", tint = White, modifier = Modifier.align(Alignment.BottomCenter).size(32.dp))
-            Text("♛", color = Gold, fontSize = 20.sp, modifier = Modifier.align(Alignment.TopCenter).offset(y = (-12).dp))
-        }
+        TmcLogo(45.dp)
         Spacer(Modifier.width(8.dp))
         Text("TMC", color = White, fontWeight = FontWeight.Black, fontSize = 22.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
         Text("VIDEOS", color = Red, fontWeight = FontWeight.Black, fontSize = 22.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
