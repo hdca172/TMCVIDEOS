@@ -41,6 +41,8 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.common.AudioAttributes
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -79,8 +81,13 @@ private fun TmcApp(activity: MainActivity) {
     var channels by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var libraryLoaded by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        channels = withContext(Dispatchers.Default) { readChannels(prefs.getString("playlist", "") ?: "") }
-        libraryLoaded = true
+        try {
+            channels = withContext(Dispatchers.Default) { readChannels(prefs.getString("playlist", "") ?: "") }
+        } catch (_: Exception) {
+            channels = emptyList()
+        } finally {
+            libraryLoaded = true
+        }
     }
     var selected by remember { mutableStateOf<Channel?>(null) }
     var urlInput by remember { mutableStateOf("") }
@@ -103,6 +110,7 @@ private fun TmcApp(activity: MainActivity) {
     val favorites = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("favorites", "") ?: "").split("\n").filter(String::isNotBlank)) } }
     val history = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("history", "") ?: "").split("\n").filter(String::isNotBlank)) } }
     fun savePlaylist(list: List<Channel>) {
+        if (!libraryLoaded) { message = "Espera a que termine de cargar tu biblioteca"; return }
         val unique = list.distinctBy { it.url }
         channels = unique
         scope.launch {
@@ -131,6 +139,7 @@ private fun TmcApp(activity: MainActivity) {
         if (uri != null) {
             try {
                 scope.launch {
+                    if (!libraryLoaded || busy) return@launch
                     busy = true
                     try {
                         val parsed = withContext(Dispatchers.IO) {
@@ -152,6 +161,7 @@ private fun TmcApp(activity: MainActivity) {
     val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/x-mpegurl")) { uri ->
         if (uri != null) {
             scope.launch {
+                if (busy || !libraryLoaded) return@launch
                 busy = true
                 try {
                     val snapshot = channels
@@ -329,7 +339,7 @@ private fun TmcApp(activity: MainActivity) {
                 "Listas M3U" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionTitle("Mis listas de reproducción")
                     Text("Añade tus propias listas M3U/M3U8 autorizadas para ver los canales.", color = Color.LightGray, fontSize = 13.sp)
-                    NeonCard { Row(Modifier.fillMaxWidth().clickable(enabled = !busy) { importFile.launch("*/*") }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.FileOpen, null, tint = Blue); Spacer(Modifier.width(12.dp)); Text("Importar archivo .m3u / .m3u8", color = White) } }
+                    NeonCard { Row(Modifier.fillMaxWidth().clickable(enabled = !busy && libraryLoaded) { importFile.launch("*/*") }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.FileOpen, null, tint = Blue); Spacer(Modifier.width(12.dp)); Text("Importar archivo .m3u / .m3u8", color = White) } }
                     OutlinedTextField(urlInput, { urlInput = it }, label = { Text("URL de lista M3U (HTTP o HTTPS)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     Button(onClick = {
                         val candidate = urlInput.trim()
@@ -366,7 +376,7 @@ private fun TmcApp(activity: MainActivity) {
                     }
                     NeonCard { Column(Modifier.padding(14.dp)) { Text("Mi lista", color = White, fontWeight = FontWeight.Bold); Text("${channels.size} canales importados", color = Color.LightGray, fontSize = 12.sp); Text("Las listas se guardan localmente en este dispositivo.", color = Color.Gray, fontSize = 11.sp) } }
                     Button(onClick = { exportFile.launch("TMCVIDEOS.m3u") }, enabled = channels.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Red)) { Icon(Icons.Default.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Exportar lista M3U") }
-                    OutlinedButton(onClick = { showDeleteConfirmation = true }, enabled = channels.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Eliminar canales importados") }
+                    OutlinedButton(onClick = { showDeleteConfirmation = true }, enabled = channels.isNotEmpty() && libraryLoaded && !busy, modifier = Modifier.fillMaxWidth()) { Text("Eliminar canales importados") }
                 }
                 "Videos" -> Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionTitle("Videos")
@@ -609,8 +619,11 @@ private fun TmcApp(activity: MainActivity) {
     var fullscreen by remember(c.url) { mutableStateOf(false) }
     var playerReady by remember(c.url) { mutableStateOf(false) }
     var isBuffering by remember(c.url) { mutableStateOf(false) }
-    val player = remember(c.url) { ExoPlayer.Builder(context).build().apply {
+    val player = remember(c.url) {
+        val renderers = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
+        ExoPlayer.Builder(context, renderers).build().apply {
         volume = 1f
+        setAudioAttributes(AudioAttributes.DEFAULT, true)
         addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 playerReady = playbackState == Player.STATE_READY
