@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
@@ -301,8 +302,21 @@ private fun TmcApp(activity: MainActivity) {
 @Composable private fun PlayerScreen(c: Channel, toggle: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var playbackError by remember(c.url) { mutableStateOf<String?>(null) }
+    var audioStatus by remember(c.url) { mutableStateOf("Comprobando pista de audio...") }
+    var volume by remember(c.url) { mutableFloatStateOf(1f) }
+    var muted by remember(c.url) { mutableStateOf(false) }
     val player = remember(c.url) { ExoPlayer.Builder(context).build().apply {
+        volume = 1f
         addListener(object : Player.Listener {
+            override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+                audioStatus = when {
+                    audioGroups.isEmpty() -> "Esta transmisión no anuncia una pista de audio. Puede ser una fuente sin sonido."
+                    audioGroups.none { group -> (0 until group.length).any { group.isTrackSupported(it) } } -> "El dispositivo no admite el formato de audio de esta transmisión."
+                    audioGroups.none { group -> (0 until group.length).any { group.isTrackSelected(it) } } -> "No hay una pista de audio seleccionada."
+                    else -> "Pista de audio detectada y seleccionada."
+                }
+            }
             override fun onPlayerError(error: PlaybackException) {
                 playbackError = "Error de reproducción (${error.errorCodeName}): ${error.cause?.localizedMessage ?: error.localizedMessage ?: "origen o formato incompatible"}"
             }
@@ -316,6 +330,17 @@ private fun TmcApp(activity: MainActivity) {
             Text(c.name, color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp)); Text(c.group, color = Color.LightGray)
             if (playbackError != null) Text(playbackError!!, color = Red, fontSize = 13.sp)
+            Spacer(Modifier.height(12.dp))
+            Text("Audio", color = White, fontWeight = FontWeight.Bold)
+            Text(audioStatus, color = Color.LightGray, fontSize = 12.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { muted = !muted; player.volume = if (muted) volume else 0f }) {
+                    Icon(if (muted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, if (muted) "Activar sonido" else "Silenciar", tint = White)
+                }
+                Slider(value = volume, onValueChange = { volume = it; if (!muted) player.volume = it }, valueRange = 0f..1f, modifier = Modifier.weight(1f))
+                Text("${(volume * 100).toInt()}%", color = White, fontSize = 12.sp)
+            }
+            Text("Si la pista está detectada y sigue sin oírse, comprueba el volumen multimedia del teléfono y prueba otro canal.", color = Color.Gray, fontSize = 12.sp)
             Spacer(Modifier.height(16.dp))
             NeonCard { Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 IconButton(onClick = toggle) { Icon(Icons.Default.FavoriteBorder, "Favorito", tint = Red) }
