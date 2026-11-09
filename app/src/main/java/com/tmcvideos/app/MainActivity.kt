@@ -385,23 +385,35 @@ private fun TmcApp(activity: MainActivity) {
                     Text("TMCVIDEOS · Versión 2.0 · Media3", color = Color.Gray, fontSize = 12.sp)
                 }
             }
-            if (showMenu) AlertDialog(
-                onDismissRequest = { showMenu = false },
-                title = { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PlayCircle, null, tint = Red); Spacer(Modifier.width(8.dp)); Text("TMCVIDEOS") } },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            if (showMenu) {
+                Row(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .78f))) {
+                    Column(Modifier.fillMaxHeight().fillMaxWidth(.83f)
+                        .background(Color(0xFF101015)).verticalScroll(rememberScrollState())) {
+                        Row(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Color(0xFF27151B), Color(0xFF101015)))).padding(19.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.PlayCircle, null, tint = Red, modifier = Modifier.size(37.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text("TMC", color = White, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                            Text("VIDEOS", color = Red, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                        }
                         listOf("Inicio", "Explorar", "TV en vivo", "Videos", "Favoritos", "Historial", "Listas M3U", "Ajustes").forEach { destination ->
-                            Row(Modifier.fillMaxWidth().clickable { showMenu = false; screen = destination }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(when(destination) { "Inicio" -> Icons.Default.Home; "Explorar" -> Icons.Default.Explore; "TV en vivo" -> Icons.Default.LiveTv; "Videos" -> Icons.Default.VideoLibrary; "Favoritos" -> Icons.Default.Favorite; "Historial" -> Icons.Default.History; "Listas M3U" -> Icons.Default.PlaylistPlay; else -> Icons.Default.Settings }, null, tint = if (screen == destination) Red else White)
-                                Spacer(Modifier.width(12.dp))
-                                Text(destination, color = White)
+                            val active = screen == destination
+                            Row(Modifier.fillMaxWidth()
+                                .background(if (active) Brush.horizontalGradient(listOf(Red, Color(0xFF36131B))) else Brush.horizontalGradient(listOf(Color(0xFF101015), Color(0xFF101015))))
+                                .clickable { showMenu = false; screen = destination }
+                                .padding(horizontal = 21.dp, vertical = 17.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(when(destination) { "Inicio" -> Icons.Default.Home; "Explorar" -> Icons.Default.Explore; "TV en vivo" -> Icons.Default.LiveTv; "Videos" -> Icons.Default.VideoLibrary; "Favoritos" -> Icons.Default.Favorite; "Historial" -> Icons.Default.History; "Listas M3U" -> Icons.Default.PlaylistPlay; else -> Icons.Default.Settings }, null, tint = White)
+                                Spacer(Modifier.width(18.dp))
+                                Text(destination, color = White, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, fontSize = 16.sp)
                             }
                         }
+                        HorizontalDivider(color = Color(0xFF35353B))
+                        Text("TMCVIDEOS · Android", modifier = Modifier.padding(20.dp), color = Color.LightGray, fontSize = 12.sp)
                     }
-                },
-                confirmButton = { TextButton(onClick = { showMenu = false }) { Text("Cerrar") } }
-            )
-            if (showExitConfirmation) AlertDialog(
+                    Box(Modifier.fillMaxSize().clickable { showMenu = false })
+                }
+            }
+                        if (showExitConfirmation) AlertDialog(
                 onDismissRequest = { showExitConfirmation = false },
                 title = { Text("Salir de TMCVIDEOS") },
                 text = { Text("¿Quieres cerrar la aplicación?") },
