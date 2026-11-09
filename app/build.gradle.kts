@@ -43,4 +43,5 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-rtsp:1.6.1")
     implementation("androidx.media3:media3-ui:1.6.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("org.videolan.android:libvlc-all:3.5.1")
 }
