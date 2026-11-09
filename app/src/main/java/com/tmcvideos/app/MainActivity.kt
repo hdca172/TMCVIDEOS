@@ -69,7 +69,12 @@ private fun TmcApp(activity: MainActivity) {
     val prefs = remember { activity.getSharedPreferences("tmcvideos", 0) }
     var screen by remember { mutableStateOf("Inicio") }
     var previousScreen by remember { mutableStateOf("TV en vivo") }
-    var channels by remember { mutableStateOf(readChannels(prefs.getString("playlist", "") ?: "")) }
+    var channels by remember { mutableStateOf<List<Channel>>(emptyList()) }
+    var libraryLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        channels = withContext(Dispatchers.Default) { readChannels(prefs.getString("playlist", "") ?: "") }
+        libraryLoaded = true
+    }
     var selected by remember { mutableStateOf<Channel?>(null) }
     var urlInput by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf("") }
@@ -78,6 +83,11 @@ private fun TmcApp(activity: MainActivity) {
     var message by remember { mutableStateOf("") }
     var sourceName by remember { mutableStateOf(prefs.getString("source_name", "Mi lista") ?: "Mi lista") }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showExitConfirmation by remember { mutableStateOf(false) }
+    var editingChannel by remember { mutableStateOf<Channel?>(null) }
+    var editName by remember { mutableStateOf("") }
+    var editGroup by remember { mutableStateOf("") }
+    var editUrl by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     var autoplay by remember { mutableStateOf(prefs.getBoolean("autoplay", true)) }
     var diagnostics by remember { mutableStateOf(prefs.getBoolean("diagnostics", true)) }
@@ -86,7 +96,10 @@ private fun TmcApp(activity: MainActivity) {
     fun savePlaylist(list: List<Channel>) {
         val unique = list.distinctBy { it.url }
         channels = unique
-        prefs.edit().putString("playlist", exportM3u(unique)).apply()
+        scope.launch {
+            val serialized = withContext(Dispatchers.Default) { exportM3u(unique) }
+            withContext(Dispatchers.IO) { prefs.edit().putString("playlist", serialized).commit() }
+        }
     }
     fun play(c: Channel) {
         if (screen != "Reproductor") previousScreen = screen
@@ -130,9 +143,10 @@ private fun TmcApp(activity: MainActivity) {
         }
     }
     fun navigateBack() {
-        screen = if (screen == "Reproductor") previousScreen.takeUnless { it == "Reproductor" } ?: "TV en vivo" else "Inicio"
+        if (screen == "Inicio") showExitConfirmation = true
+        else screen = if (screen == "Reproductor") previousScreen.takeUnless { it == "Reproductor" } ?: "TV en vivo" else "Inicio"
     }
-    BackHandler(enabled = screen != "Inicio") { navigateBack() }
+    BackHandler { navigateBack() }
     Column(Modifier.fillMaxSize().background(Back)) {
         TmcHeader(screen, onBack = { navigateBack() })
         Box(Modifier.weight(1f)) {
@@ -279,23 +293,40 @@ private fun TmcApp(activity: MainActivity) {
                 "Listas M3U" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionTitle("Mis listas de reproducción")
                     Text("Añade tus propias listas M3U/M3U8 autorizadas para ver los canales.", color = Color.LightGray, fontSize = 13.sp)
-                    NeonCard { Row(Modifier.fillMaxWidth().clickable { importFile.launch("*/*") }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.FileOpen, null, tint = Blue); Spacer(Modifier.width(12.dp)); Text("Importar archivo .m3u / .m3u8", color = White) } }
+                    NeonCard { Row(Modifier.fillMaxWidth().clickable(enabled = !busy) { importFile.launch("*/*") }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.FileOpen, null, tint = Blue); Spacer(Modifier.width(12.dp)); Text("Importar archivo .m3u / .m3u8", color = White) } }
                     OutlinedTextField(urlInput, { urlInput = it }, label = { Text("URL de lista M3U (HTTP o HTTPS)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     Button(onClick = {
                         val candidate = urlInput.trim()
                         if (!isWebUrl(candidate)) { message = "Introduce un enlace HTTP o HTTPS válido"; return@Button }
-                        busy = true
-                    }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Importando..." else "Importar desde URL") }
-                    LaunchedEffect(busy) {
-                        if (busy) {
+                        scope.launch {
+                            busy = true
                             try {
-                                val content = withContext(Dispatchers.IO) { downloadPlaylist(urlInput.trim()) }
-                                val found = readChannels(content)
-                                if (found.isEmpty()) message = "No se detectaron canales M3U. Comprueba que la URL devuelve una lista #EXTM3U y no una página web o una transmisión individual."
-                                else { savePlaylist(channels + found); message = "Importados ${found.size} canales" }
-                            } catch (e: Exception) { message = if (e.message?.contains("HTTP 403") == true) "HTTP 403: el servidor denegó el acceso a la lista. Verifica que el enlace siga autorizado y consulta al proveedor; la aplicación no puede eliminar esa restricción." else "No se pudo descargar la lista: ${e.localizedMessage ?: "error de conexión"}. Revisa la URL y el servidor." }
-                            busy = false
+                                val found = withContext(Dispatchers.IO) { readChannels(downloadPlaylist(candidate)) }
+                                if (found.isEmpty()) message = "No se detectaron canales M3U en la URL."
+                                else { savePlaylist(channels + found); message = "Importados " + found.size + " canales"; urlInput = "" }
+                            } catch (e: Exception) {
+                                message = if (e.message?.contains("HTTP 403") == true) "HTTP 403: el servidor denegó el acceso." else "Error al descargar la lista: " + (e.localizedMessage ?: "Comprueba la conexión")
+                            } finally { busy = false }
                         }
+                    }, enabled = !busy && libraryLoaded, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Importando..." else "Agregar otra lista desde URL") }
+                    if (busy || !libraryLoaded) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text("Puedes agregar más listas sin borrar los canales anteriores. Los enlaces repetidos se omiten.", color = Color.LightGray, fontSize = 12.sp)
+                    if (channels.isNotEmpty()) {
+                        Text("Editar canales importados", color = White, fontWeight = FontWeight.Bold)
+                        channels.take(100).forEach { c ->
+                            NeonCard {
+                                Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(c.name, color = White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(c.group, color = Color.LightGray, fontSize = 11.sp)
+                                    }
+                                    IconButton(onClick = {
+                                        editingChannel = c; editName = c.name; editGroup = c.group; editUrl = c.url
+                                    }) { Icon(Icons.Default.Edit, "Editar canal", tint = Gold) }
+                                }
+                            }
+                        }
+                        if (channels.size > 100) Text("Se muestran los primeros 100 canales para editar.", color = Color.LightGray, fontSize = 12.sp)
                     }
                     NeonCard { Column(Modifier.padding(14.dp)) { Text("Mi lista", color = White, fontWeight = FontWeight.Bold); Text("${channels.size} canales importados", color = Color.LightGray, fontSize = 12.sp); Text("Las listas se guardan localmente en este dispositivo.", color = Color.Gray, fontSize = 11.sp) } }
                     Button(onClick = { exportFile.launch("TMCVIDEOS.m3u") }, enabled = channels.isNotEmpty(), modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Red)) { Icon(Icons.Default.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Exportar lista M3U") }
@@ -338,6 +369,35 @@ private fun TmcApp(activity: MainActivity) {
                     OutlinedButton(onClick = { favorites.clear(); prefs.edit().remove("favorites").apply(); message = "Favoritos eliminados" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar favoritos") }
                     Text("TMCVIDEOS · Versión 2.0 · Media3", color = Color.Gray, fontSize = 12.sp)
                 }
+            }
+            if (showExitConfirmation) AlertDialog(
+                onDismissRequest = { showExitConfirmation = false },
+                title = { Text("Salir de TMCVIDEOS") },
+                text = { Text("¿Quieres cerrar la aplicación?") },
+                confirmButton = { TextButton(onClick = { showExitConfirmation = false; activity.finish() }) { Text("Salir") } },
+                dismissButton = { TextButton(onClick = { showExitConfirmation = false }) { Text("Cancelar") } }
+            )
+            editingChannel?.let { original ->
+                AlertDialog(
+                    onDismissRequest = { editingChannel = null },
+                    title = { Text("Editar canal") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(editName, { editName = it }, label = { Text("Nombre") }, singleLine = true)
+                            OutlinedTextField(editGroup, { editGroup = it }, label = { Text("Categoría") }, singleLine = true)
+                            OutlinedTextField(editUrl, { editUrl = it }, label = { Text("URL de reproducción") }, singleLine = true)
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = {
+                        if (editName.isBlank() || !isWebUrl(editUrl.trim())) message = "Escribe un nombre y una URL HTTP/HTTPS válida"
+                        else {
+                            savePlaylist(channels.map { if (it.url == original.url) original.copy(name = editName.trim(), group = editGroup.trim().ifBlank { "General" }, url = editUrl.trim()) else it })
+                            editingChannel = null
+                            message = "Canal actualizado"
+                        }
+                    }) { Text("Guardar") } },
+                    dismissButton = { TextButton(onClick = { editingChannel = null }) { Text("Cancelar") } }
+                )
             }
             if (showDeleteConfirmation) AlertDialog(onDismissRequest = { showDeleteConfirmation = false }, title = { Text("Eliminar canales") }, text = { Text("Se eliminarán los canales importados de este dispositivo. ¿Continuar?") }, confirmButton = { TextButton(onClick = { savePlaylist(emptyList()); showDeleteConfirmation = false; message = "Canales eliminados" }) { Text("Eliminar") } }, dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancelar") } })
             if (message.isNotBlank()) AlertDialog(onDismissRequest = { message = "" }, title = { Text("TMCVIDEOS") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { message = "" }) { Text("Aceptar") } })
