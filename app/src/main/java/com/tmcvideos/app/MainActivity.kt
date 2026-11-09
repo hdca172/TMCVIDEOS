@@ -39,6 +39,7 @@ import java.util.UUID
 
 private val Back = Color(0xFF050712)
 private val Surface = Color(0xFF12192D)
+private val Gold = Color(0xFFFFCD35)
 private val Red = Color(0xFFF10834)
 private val Blue = Color(0xFF2675FF)
 private val Purple = Color(0xFF9E3DFF)
@@ -113,6 +114,20 @@ private fun TmcApp(activity: MainActivity) {
                 "Inicio" -> LazyColumn(contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
                         HeroCard { screen = "TV en vivo" }
+                        Spacer(Modifier.height(12.dp))
+                        NeonCard {
+                            Row(Modifier.fillMaxWidth().clickable { screen = "Listas M3U" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(48.dp).background(Brush.linearGradient(listOf(Red, Purple)), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.PlaylistAdd, "Agregar lista M3U", tint = White, modifier = Modifier.size(30.dp))
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("Agregar lista M3U", color = White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                                    Text("Importa desde archivo o enlace HTTPS", color = Color.LightGray, fontSize = 12.sp)
+                                }
+                                Icon(Icons.Default.ChevronRight, null, tint = Gold)
+                            }
+                        }
                         Spacer(Modifier.height(16.dp))
                         SectionTitle("Accesos rápidos")
                         Spacer(Modifier.height(9.dp))
@@ -167,7 +182,8 @@ private fun TmcApp(activity: MainActivity) {
                     }
                 }
                 "Listas M3U" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionTitle("Listas M3U")
+                    SectionTitle("Mis listas de reproducción")
+                    Text("Añade tus propias listas M3U/M3U8 autorizadas para ver los canales.", color = Color.LightGray, fontSize = 13.sp)
                     NeonCard { Row(Modifier.fillMaxWidth().clickable { importFile.launch("*/*") }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.FileOpen, null, tint = Blue); Spacer(Modifier.width(12.dp)); Text("Importar archivo .m3u / .m3u8", color = White) } }
                     OutlinedTextField(urlInput, { urlInput = it }, label = { Text("URL de lista M3U (HTTPS)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     Button(onClick = {
@@ -208,8 +224,8 @@ private fun TmcApp(activity: MainActivity) {
             if (message.isNotBlank()) AlertDialog(onDismissRequest = { message = "" }, title = { Text("TMCVIDEOS") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { message = "" }) { Text("Aceptar") } })
         }
         NavigationBar(containerColor = Color(0xFF090F21)) {
-            listOf(Triple("Inicio", Icons.Default.Home, "Inicio"), Triple("Explorar", Icons.Default.Explore, "TV en vivo"), Triple("TV", Icons.Default.PlayCircle, "TV en vivo"), Triple("Favoritos", Icons.Default.FavoriteBorder, "Favoritos"), Triple("Ajustes", Icons.Default.Settings, "Ajustes")).forEach { (label, icon, target) ->
-                NavigationBarItem(selected = screen == target || (label == "Explorar" && screen == "Explorar"), onClick = { screen = target }, icon = { Icon(icon, label) }, label = { Text(label, fontSize = 10.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Red, selectedTextColor = Red, unselectedIconColor = White, unselectedTextColor = White))
+            listOf(Triple("Inicio", Icons.Default.Home, "Inicio"), Triple("TV", Icons.Default.LiveTv, "TV en vivo"), Triple("Listas", Icons.Default.PlaylistAdd, "Listas M3U"), Triple("Favoritos", Icons.Default.FavoriteBorder, "Favoritos"), Triple("Ajustes", Icons.Default.Settings, "Ajustes")).forEach { (label, icon, target) ->
+                NavigationBarItem(selected = screen == target, onClick = { screen = target }, icon = { Icon(icon, label) }, label = { Text(label, fontSize = 10.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Red, selectedTextColor = Red, unselectedIconColor = White, unselectedTextColor = White))
             }
         }
     }
@@ -219,7 +235,9 @@ private fun TmcApp(activity: MainActivity) {
     Row(Modifier.fillMaxWidth().background(Back).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) { Icon(if (screen == "Inicio") Icons.Default.Menu else Icons.Default.ArrowBack, null, tint = White) }
         Spacer(Modifier.width(8.dp))
-        Icon(Icons.Default.EmojiEvents, null, tint = Color(0xFFFFCD35), modifier = Modifier.size(25.dp))
+        Box(Modifier.size(34.dp).border(1.dp, Gold, RoundedCornerShape(10.dp)).background(Brush.linearGradient(listOf(Red, Purple)), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.PlayArrow, "TMCVIDEOS", tint = White, modifier = Modifier.size(24.dp))
+        }
         Spacer(Modifier.width(4.dp))
         Text("TMC", color = White, fontSize = 23.sp, fontWeight = FontWeight.Black, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
         Text("VIDEOS", color = Red, fontSize = 23.sp, fontWeight = FontWeight.Black, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
@@ -236,6 +254,8 @@ private fun TmcApp(activity: MainActivity) {
             Spacer(Modifier.height(6.dp))
             Text("TV EN VIVO", color = White, fontWeight = FontWeight.Black, fontSize = 27.sp)
             Text("Todos tus canales en un solo lugar", color = White, fontSize = 11.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("EXPLORAR CANALES  ›", color = Gold, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
         Icon(Icons.Default.PlayCircle, null, tint = White, modifier = Modifier.align(Alignment.CenterEnd).size(50.dp))
     }
