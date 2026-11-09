@@ -5,6 +5,9 @@ import android.os.Bundle
 import android.net.Uri
 import android.widget.Toast
 import android.view.SurfaceView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer as VlcMediaPlayer
@@ -687,42 +690,59 @@ private fun TmcApp(activity: MainActivity) {
 
 @Composable private fun LibVlcSurface(url: String, autoplay: Boolean, modifier: Modifier = Modifier, onError: (String) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val latestError by rememberUpdatedState(onError)
     val vlc = remember(url) {
         try {
-            val engine = LibVLC(context, arrayListOf("--network-caching=1500", "--live-caching=1500"))
-            val mediaPlayer = VlcMediaPlayer(engine)
-            Pair(engine, mediaPlayer)
+            val engine = LibVLC(context.applicationContext, arrayListOf("--network-caching=1200", "--live-caching=1200"))
+            Pair(engine, VlcMediaPlayer(engine))
         } catch (e: Exception) {
-            latestError("No se pudo iniciar LibVLC: " + (e.localizedMessage ?: "error desconocido"))
             null
         }
     }
     if (vlc == null) {
         Box(modifier.background(Color.Black), contentAlignment = Alignment.Center) {
-            Text("No se pudo iniciar el motor VLC. Selecciona Media3.", color = White)
+            Text("Motor VLC no disponible. Prueba Media3.", color = White)
         }
         return
     }
     val mediaPlayer = vlc.second
-    AndroidView(factory = { ctx ->
-        SurfaceView(ctx).apply {
-            mediaPlayer.vlcVout.setVideoView(this)
-            mediaPlayer.vlcVout.attachViews()
-            val media = Media(vlc.first, Uri.parse(url))
-            media.setHWDecoderEnabled(true, false)
-            media.addOption(":network-caching=1500")
-            mediaPlayer.media = media
-            media.release()
-            if (autoplay) mediaPlayer.play()
+    var surface by remember(url) { mutableStateOf<SurfaceView?>(null) }
+    AndroidView(factory = { ctx -> SurfaceView(ctx).also { surface = it } },
+        modifier = modifier, update = { surface = it })
+    DisposableEffect(vlc, surface, lifecycleOwner) {
+        val view = surface
+        if (view != null) {
+            try {
+                mediaPlayer.vlcVout.setVideoView(view)
+                mediaPlayer.vlcVout.attachViews()
+                val media = Media(vlc.first, Uri.parse(url))
+                media.setHWDecoderEnabled(true, false)
+                media.addOption(":network-caching=1200")
+                mediaPlayer.media = media
+                media.release()
+                if (autoplay) mediaPlayer.play()
+            } catch (e: Exception) {
+                latestError("Error al iniciar video: " + (e.localizedMessage ?: "desconocido"))
+            }
         }
-    }, modifier = modifier)
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> mediaPlayer.pause()
+                Lifecycle.Event.ON_START -> if (autoplay && view != null) mediaPlayer.play()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            try { mediaPlayer.stop() } catch (_: Exception) {}
+            try { mediaPlayer.vlcVout.detachViews() } catch (_: Exception) {}
+        }
+    }
     DisposableEffect(vlc) {
         onDispose {
-            mediaPlayer.stop()
-            mediaPlayer.vlcVout.detachViews()
-            mediaPlayer.release()
-            vlc.first.release()
+            try { mediaPlayer.release() } finally { vlc.first.release() }
         }
     }
 }
@@ -787,10 +807,10 @@ private fun TmcApp(activity: MainActivity) {
             else -> null
         }
         setMediaItem(MediaItem.Builder().setUri(uri).apply { if (mime != null) setMimeType(mime) }.build())
-        prepare(); playWhenReady = autoplay
+        playWhenReady = false
     } }
     DisposableEffect(player) { onDispose { player.release() } }
-    LaunchedEffect(useVlc, player) { if (useVlc) player.pause() else { player.prepare(); if (autoplay) player.play() } }
+    LaunchedEffect(useVlc, player) { if (useVlc) { player.stop(); player.clearMediaItems() } else { player.setMediaItem(MediaItem.fromUri(c.url)); player.prepare(); player.playWhenReady = autoplay } }
     if (fullscreen) Dialog(onDismissRequest = { fullscreen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxWidth().background(Color.Black)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
