@@ -70,6 +70,7 @@ private fun TmcApp(activity: MainActivity) {
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var sourceName by remember { mutableStateOf(prefs.getString("source_name", "Mi lista") ?: "Mi lista") }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
     val favorites = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("favorites", "") ?: "").split("\n").filter(String::isNotBlank)) } }
     val history = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("history", "") ?: "").split("\n").filter(String::isNotBlank)) } }
     fun savePlaylist(list: List<Channel>) {
@@ -81,7 +82,8 @@ private fun TmcApp(activity: MainActivity) {
         selected = c
         history.remove(c.url)
         history.add(0, c.url)
-        prefs.edit().putString("history", history.take(100).joinToString("\n")).apply()
+        while (history.size > 100) history.removeAt(history.lastIndex)
+        prefs.edit().putString("history", history.joinToString("\n")).apply()
         screen = "Reproductor"
     }
     fun toggleFavorite(c: Channel) {
@@ -106,9 +108,6 @@ private fun TmcApp(activity: MainActivity) {
             try { activity.contentResolver.openOutputStream(uri)?.use { it.write(exportM3u(channels).toByteArray()) }; message = "Lista exportada" }
             catch (e: Exception) { message = "Error al exportar" }
         }
-    }
-    LaunchedEffect(urlInput, busy) {
-        // La importación remota se inicia expresamente mediante el botón, nunca automáticamente.
     }
     Column(Modifier.fillMaxSize().background(Back)) {
         TmcHeader(screen, onBack = { screen = "Inicio" })
@@ -135,10 +134,10 @@ private fun TmcApp(activity: MainActivity) {
                         SectionTitle("Accesos rápidos")
                         Spacer(Modifier.height(9.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            QuickTile("TV en vivo", Color(0xFF6627ED), Icons.Default.Tv, Modifier.weight(1f)) { screen = "TV en vivo" }
+                            QuickTile("TV en vivo", Color(0xFF6627ED), Icons.Default.Tv, Modifier.weight(1f)) { categoryFilter = "Todos"; searching = ""; screen = "TV en vivo" }
                             QuickTile("Videos", Blue, Icons.Default.PlayCircle, Modifier.weight(1f)) { screen = "Videos" }
                             QuickTile("Mis videos", Color(0xFF0C9B51), Icons.Default.Folder, Modifier.weight(1f)) { videoFile.launch(arrayOf("video/*")) }
-                            QuickTile("Favoritos", Color(0xFFFF651A), Icons.Default.Star, Modifier.weight(1f)) { screen = "Favoritos" }
+                            QuickTile("Favoritos", Color(0xFFFF651A), Icons.Default.Star, Modifier.weight(1f)) { searching = ""; screen = "Favoritos" }
                         }
                         Spacer(Modifier.height(18.dp))
                         SectionTitle("Categorías")
@@ -150,6 +149,8 @@ private fun TmcApp(activity: MainActivity) {
                             QuickTile("Infantil", Color(0xFFDF6906), Icons.Default.ChildCare, Modifier.weight(1f)) { categoryFilter = "Infantil"; screen = "TV en vivo" }
                         }
                         Spacer(Modifier.height(18.dp))
+                        NeonCard { Row(Modifier.fillMaxWidth().clickable { searching = ""; screen = "Historial" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.History, null, tint = Gold); Spacer(Modifier.width(12.dp)); Text("Historial de reproducción", color = White, modifier = Modifier.weight(1f)); Text("${history.size}", color = Color.LightGray) } }
+                        Spacer(Modifier.height(16.dp))
                         SectionTitle("Últimos agregados")
                         if (channels.isEmpty()) EmptyState("Agrega una lista M3U para mostrar tus canales")
                     }
@@ -178,7 +179,15 @@ private fun TmcApp(activity: MainActivity) {
                                 Spacer(Modifier.height(8.dp))
                             }
                         }
-                        if (shown.isEmpty()) EmptyState("No hay canales aquí. Importa tu primera lista M3U.")
+                        if (shown.isEmpty()) {
+                            EmptyState(when (screen) {
+                                "Favoritos" -> "Todavía no tienes favoritos. Pulsa el corazón de un canal para guardarlo."
+                                "Historial" -> "Aún no has reproducido videos o canales."
+                                else -> if (channels.isEmpty()) "No hay canales. Importa una lista M3U." else "No hay resultados. Prueba otra categoría o búsqueda."
+                            })
+                            if (screen == "TV en vivo") TextButton(onClick = { categoryFilter = "Todos"; searching = "" }) { Text("Mostrar todos los canales") }
+                            if (screen == "TV en vivo" && channels.isEmpty()) Button(onClick = { screen = "Listas M3U" }) { Text("Agregar lista M3U") }
+                        }
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(shown, key = { it.id }) { c -> ChannelRow(c, favorites.contains(c.url), { play(c) }, { toggleFavorite(c) }) }
                         }
@@ -199,15 +208,15 @@ private fun TmcApp(activity: MainActivity) {
                             try {
                                 val content = withContext(Dispatchers.IO) { downloadPlaylist(urlInput.trim()) }
                                 val found = readChannels(content)
-                                if (found.isEmpty()) message = "La URL no contiene canales reconocidos"
+                                if (found.isEmpty()) message = "No se detectaron canales M3U. Comprueba que la URL devuelve una lista #EXTM3U y no una página web o una transmisión individual."
                                 else { savePlaylist(channels + found); message = "Importados ${found.size} canales" }
-                            } catch (e: Exception) { message = "No se pudo descargar la lista: ${e.localizedMessage ?: "error de conexión"}. Revisa la URL y el servidor." }
+                            } catch (e: Exception) { message = if (e.message?.contains("HTTP 403") == true) "HTTP 403: el servidor denegó el acceso a la lista. Verifica que el enlace siga autorizado y consulta al proveedor; la aplicación no puede eliminar esa restricción." else "No se pudo descargar la lista: ${e.localizedMessage ?: "error de conexión"}. Revisa la URL y el servidor." }
                             busy = false
                         }
                     }
                     NeonCard { Column(Modifier.padding(14.dp)) { Text("Mi lista", color = White, fontWeight = FontWeight.Bold); Text("${channels.size} canales importados", color = Color.LightGray, fontSize = 12.sp); Text("Las listas se guardan localmente en este dispositivo.", color = Color.Gray, fontSize = 11.sp) } }
                     Button(onClick = { exportFile.launch("TMCVIDEOS.m3u") }, enabled = channels.isNotEmpty(), modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Red)) { Icon(Icons.Default.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Exportar lista M3U") }
-                    OutlinedButton(onClick = { savePlaylist(emptyList()); message = "Lista vaciada" }, enabled = channels.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Eliminar canales importados") }
+                    OutlinedButton(onClick = { showDeleteConfirmation = true }, enabled = channels.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Eliminar canales importados") }
                 }
                 "Videos" -> Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionTitle("Videos")
@@ -219,16 +228,21 @@ private fun TmcApp(activity: MainActivity) {
                 "Reproductor" -> selected?.let { c -> PlayerScreen(c) { toggleFavorite(c) } }
                 "Ajustes" -> Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionTitle("Configuración")
-                    listOf("Reproductor" to "Media3 ExoPlayer", "Calidad de video" to "Automática según fuente", "Tema" to "Oscuro neón", "Idioma" to "Español", "Mis listas" to "${channels.size} canales", "Acerca de" to "TMCVIDEOS V2.0").forEach { (a,b) -> NeonCard { Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(a, color = White); Text(b, color = Color.LightGray, fontSize = 12.sp) } } }
+                    listOf("Reproductor" to "Media3 ExoPlayer", "Calidad" to "Depende de la fuente", "Tema" to "Oscuro neón", "Idioma" to "Español", "Versión" to "TMCVIDEOS V2.0").forEach { (a,b) -> NeonCard { Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(a, color = White); Text(b, color = Color.LightGray, fontSize = 12.sp) } } }
+                    Text("Información de la aplicación. Estas opciones todavía no son ajustables.", color = Color.LightGray, fontSize = 12.sp)
+                    Button(onClick = { screen = "Listas M3U" }, modifier = Modifier.fillMaxWidth()) { Text("Administrar listas M3U (${channels.size} canales)") }
+                    OutlinedButton(onClick = { searching = ""; screen = "Historial" }, modifier = Modifier.fillMaxWidth()) { Text("Ver historial (${history.size})") }
+                    OutlinedButton(onClick = { searching = ""; screen = "Favoritos" }, modifier = Modifier.fillMaxWidth()) { Text("Ver favoritos (${favorites.size})") }
                     OutlinedButton(onClick = { history.clear(); prefs.edit().remove("history").apply(); message = "Historial eliminado" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar historial") }
                     OutlinedButton(onClick = { favorites.clear(); prefs.edit().remove("favorites").apply(); message = "Favoritos eliminados" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar favoritos") }
                 }
             }
+            if (showDeleteConfirmation) AlertDialog(onDismissRequest = { showDeleteConfirmation = false }, title = { Text("Eliminar canales") }, text = { Text("Se eliminarán los canales importados de este dispositivo. ¿Continuar?") }, confirmButton = { TextButton(onClick = { savePlaylist(emptyList()); showDeleteConfirmation = false; message = "Canales eliminados" }) { Text("Eliminar") } }, dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancelar") } })
             if (message.isNotBlank()) AlertDialog(onDismissRequest = { message = "" }, title = { Text("TMCVIDEOS") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { message = "" }) { Text("Aceptar") } })
         }
         NavigationBar(containerColor = Color(0xFF090F21)) {
             listOf(Triple("Inicio", Icons.Default.Home, "Inicio"), Triple("TV", Icons.Default.LiveTv, "TV en vivo"), Triple("Listas", Icons.Default.PlaylistAdd, "Listas M3U"), Triple("Favoritos", Icons.Default.FavoriteBorder, "Favoritos"), Triple("Ajustes", Icons.Default.Settings, "Ajustes")).forEach { (label, icon, target) ->
-                NavigationBarItem(selected = screen == target, onClick = { screen = target }, icon = { Icon(icon, label) }, label = { Text(label, fontSize = 10.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Red, selectedTextColor = Red, unselectedIconColor = White, unselectedTextColor = White))
+                NavigationBarItem(selected = screen == target, onClick = { if (target == "TV en vivo") { categoryFilter = "Todos"; searching = "" }; if (target == "Favoritos") searching = ""; screen = target }, icon = { Icon(icon, label) }, label = { Text(label, fontSize = 10.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Red, selectedTextColor = Red, unselectedIconColor = White, unselectedTextColor = White))
             }
         }
     }
