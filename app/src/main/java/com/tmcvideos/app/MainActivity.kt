@@ -23,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,7 +51,7 @@ private val Blue = Color(0xFF447BFF)
 private val Purple = Color(0xFF9E3DFF)
 private val White = Color(0xFFF5F7FF)
 
-private data class Channel(val name: String, val url: String, val group: String, val id: String = UUID.randomUUID().toString())
+private data class Channel(val name: String, val url: String, val group: String, val id: String = UUID.randomUUID().toString(), val logo: String = "")
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -413,7 +415,13 @@ private fun TmcApp(activity: MainActivity) {
     Column(Modifier.width(155.dp).background(Color(0xFF161E31), RoundedCornerShape(16.dp)).clickable { play() }.padding(7.dp)) {
         Box(Modifier.fillMaxWidth().height(145.dp)
             .background(Brush.linearGradient(listOf(Color(0xFF213F78), Color(0xFF48295F), Color(0xFF7A2946))), RoundedCornerShape(12.dp))) {
-            Icon(Icons.Default.LiveTv, null, tint = White.copy(alpha = .22f), modifier = Modifier.align(Alignment.Center).size(70.dp))
+            if (c.logo.startsWith("https://") || c.logo.startsWith("http://")) {
+                AsyncImage(model = c.logo, contentDescription = "Logo de " + c.name,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.align(Alignment.Center).fillMaxWidth().height(100.dp).padding(12.dp))
+            } else {
+                Icon(Icons.Default.LiveTv, null, tint = White.copy(alpha = .22f), modifier = Modifier.align(Alignment.Center).size(70.dp))
+            }
             Box(Modifier.align(Alignment.TopStart).padding(9.dp).background(Red, RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 3.dp)) {
                 Text("EN VIVO", color = White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
@@ -499,16 +507,17 @@ private fun TmcApp(activity: MainActivity) {
 private fun readChannels(m3u: String): List<Channel> {
     val lines = m3u.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
     val output = mutableListOf<Channel>()
-    var name = "Canal"; var group = "General"
+    var name = "Canal"; var group = "General"; var logo = ""
     for (line in lines) {
         when {
             line.startsWith("#EXTINF", true) -> {
                 name = line.substringAfterLast(',', "Canal").trim().ifBlank { "Canal" }
                 group = Regex("group-title=\"([^\"]+)\"", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1) ?: "General"
+                logo = Regex("tvg-logo=\"([^\"]*)\"", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1)?.trim().orEmpty()
             }
             !line.startsWith("#") && (line.startsWith("https://") || line.startsWith("http://")) -> {
-                if (output.size < 5000) output.add(Channel(name, line, group))
-                name = "Canal"; group = "General"
+                if (output.size < 5000) output.add(Channel(name, line, group, logo = logo))
+                name = "Canal"; group = "General"; logo = ""
             }
         }
     }
@@ -517,7 +526,9 @@ private fun readChannels(m3u: String): List<Channel> {
 private fun exportM3u(channels: List<Channel>): String = buildString {
     append("#EXTM3U\n")
     channels.forEach { c ->
-        append("#EXTINF:-1 group-title=\"").append(c.group.replace("\"", "")).append("\",").append(c.name.replace("\n", " ")).append("\n")
+        append("#EXTINF:-1 group-title=\"").append(c.group.replace("\"", "")).append("\"")
+        if (c.logo.startsWith("https://") || c.logo.startsWith("http://")) append(" tvg-logo=\"").append(c.logo.replace("\"", "")).append("\"")
+        append(",").append(c.name.replace("\n", " ")).append("\n")
         append(c.url).append("\n")
     }
 }
