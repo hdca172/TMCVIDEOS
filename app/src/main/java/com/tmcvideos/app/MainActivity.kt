@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
 private fun TmcApp(activity: MainActivity) {
     val prefs = remember { activity.getSharedPreferences("tmcvideos", 0) }
     var screen by remember { mutableStateOf("Inicio") }
+    var previousScreen by remember { mutableStateOf("TV en vivo") }
     var channels by remember { mutableStateOf(readChannels(prefs.getString("playlist", "") ?: "")) }
     var selected by remember { mutableStateOf<Channel?>(null) }
     var urlInput by remember { mutableStateOf("") }
@@ -87,6 +89,7 @@ private fun TmcApp(activity: MainActivity) {
         prefs.edit().putString("playlist", exportM3u(unique)).apply()
     }
     fun play(c: Channel) {
+        if (screen != "Reproductor") previousScreen = screen
         selected = c
         history.remove(c.url)
         history.add(0, c.url)
@@ -126,8 +129,12 @@ private fun TmcApp(activity: MainActivity) {
             catch (e: Exception) { message = "Error al exportar" }
         }
     }
+    fun navigateBack() {
+        screen = if (screen == "Reproductor") previousScreen.takeUnless { it == "Reproductor" } ?: "TV en vivo" else "Inicio"
+    }
+    BackHandler(enabled = screen != "Inicio") { navigateBack() }
     Column(Modifier.fillMaxSize().background(Back)) {
-        TmcHeader(screen, onBack = { screen = "Inicio" })
+        TmcHeader(screen, onBack = { navigateBack() })
         Box(Modifier.weight(1f)) {
             when (screen) {
                 "Inicio" -> LazyColumn(contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
