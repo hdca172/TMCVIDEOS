@@ -118,7 +118,7 @@ private fun TmcApp(activity: MainActivity) {
                     item {
                         Text("TU ENTRETENIMIENTO", color = Gold, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
                         Spacer(Modifier.height(5.dp))
-                        Text("Todo en un solo lugar.", color = White, fontWeight = FontWeight.Black, fontSize = 25.sp)
+                        Text("Descubre qué ver hoy", color = White, fontWeight = FontWeight.Black, fontSize = 26.sp)
                         Spacer(Modifier.height(14.dp))
                         HeroCard { categoryFilter = "Todos"; searching = ""; screen = "TV en vivo" }
                         Spacer(Modifier.height(12.dp))
@@ -142,27 +142,42 @@ private fun TmcApp(activity: MainActivity) {
                             }
                         }
                         Spacer(Modifier.height(16.dp))
-                        SectionTitle("Accesos rápidos")
-                        Spacer(Modifier.height(9.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            QuickTile("TV en vivo", Color(0xFF6627ED), Icons.Default.Tv, Modifier.weight(1f)) { categoryFilter = "Todos"; searching = ""; screen = "TV en vivo" }
-                            QuickTile("Videos", Blue, Icons.Default.PlayCircle, Modifier.weight(1f)) { screen = "Videos" }
-                            QuickTile("Mis videos", Color(0xFF0C9B51), Icons.Default.Folder, Modifier.weight(1f)) { videoFile.launch(arrayOf("video/*")) }
-                            QuickTile("Favoritos", Color(0xFFFF651A), Icons.Default.Star, Modifier.weight(1f)) { searching = ""; screen = "Favoritos" }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Explora por categoría", color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { categoryFilter = "Todos"; searching = ""; screen = "TV en vivo" }) { Text("Ver todo", color = Gold) }
+                        }
+                        Text("Encuentra transmisiones según tus intereses", color = Color(0xFF9DAAC5), fontSize = 12.sp)
+                        Spacer(Modifier.height(10.dp))
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                            CategoryPill("Deportes", Icons.Default.SportsSoccer, Color(0xFF39DDA0)) { categoryFilter = "Deportes"; searching = ""; screen = "TV en vivo" }
+                            CategoryPill("Noticias", Icons.Default.Newspaper, Blue) { categoryFilter = "Noticias"; searching = ""; screen = "TV en vivo" }
+                            CategoryPill("Música", Icons.Default.MusicNote, Color(0xFFBB80FF)) { categoryFilter = "Música"; searching = ""; screen = "TV en vivo" }
+                            CategoryPill("Infantil", Icons.Default.ChildCare, Color(0xFFFFB55D)) { categoryFilter = "Infantil"; searching = ""; screen = "TV en vivo" }
                         }
                         Spacer(Modifier.height(18.dp))
-                        SectionTitle("Categorías")
-                        Spacer(Modifier.height(9.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            QuickTile("Deportes", Color(0xFF159445), Icons.Default.SportsSoccer, Modifier.weight(1f)) { categoryFilter = "Deportes"; screen = "TV en vivo" }
-                            QuickTile("Noticias", Blue, Icons.Default.Newspaper, Modifier.weight(1f)) { categoryFilter = "Noticias"; screen = "TV en vivo" }
-                            QuickTile("Música", Color(0xFF6C20C9), Icons.Default.MusicNote, Modifier.weight(1f)) { categoryFilter = "Música"; screen = "TV en vivo" }
-                            QuickTile("Infantil", Color(0xFFDF6906), Icons.Default.ChildCare, Modifier.weight(1f)) { categoryFilter = "Infantil"; screen = "TV en vivo" }
+                        if (history.isNotEmpty()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Seguir viendo", color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                TextButton(onClick = { searching = ""; screen = "Historial" }) { Text("Ver historial", color = Gold) }
+                            }
+                            val recent = history.first()
+                            val recentChannel = channels.find { it.url == recent }
+                            NeonCard {
+                                Row(Modifier.fillMaxWidth().clickable { play(recentChannel ?: Channel("Video reciente", recent, "Historial")) }.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.size(52.dp).background(Brush.linearGradient(listOf(Blue, Purple)), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.PlayArrow, null, tint = White, modifier = Modifier.size(30.dp)) }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(recentChannel?.name ?: "Continuar reproducción", color = White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("Toca para reproducir", color = Color(0xFFABB6CF), fontSize = 12.sp)
+                                    }
+                                    Icon(Icons.Default.ChevronRight, null, tint = Gold)
+                                }
+                            }
+                            Spacer(Modifier.height(18.dp))
                         }
-                        Spacer(Modifier.height(18.dp))
                         NeonCard { Row(Modifier.fillMaxWidth().clickable { searching = ""; screen = "Historial" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.History, null, tint = Gold); Spacer(Modifier.width(12.dp)); Text("Historial de reproducción", color = White, modifier = Modifier.weight(1f)); Text("${history.size}", color = Color.LightGray) } }
                         Spacer(Modifier.height(16.dp))
-                        SectionTitle("Últimos agregados")
+                        SectionTitle("Canales destacados")
                         if (channels.isEmpty()) EmptyState("Agrega una lista M3U para mostrar tus canales")
                     }
                     items(channels.takeLast(8).reversed()) { ChannelRow(it, favorites.contains(it.url), { play(it) }, { toggleFavorite(it) }) }
@@ -350,23 +365,13 @@ private fun TmcApp(activity: MainActivity) {
         ) { Icon(Icons.Default.PlayArrow, null, tint = White, modifier = Modifier.size(43.dp)) }
     }
 }
-@Composable private fun QuickTile(
-    label: String, color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier, onClick: () -> Unit
-) {
-    Column(
-        modifier.height(96.dp).background(Color(0xFF171F33), RoundedCornerShape(14.dp))
-            .border(1.dp, color.copy(alpha = .55f), RoundedCornerShape(14.dp))
-            .clickable { onClick() }.padding(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            Modifier.size(39.dp).background(color.copy(alpha = .23f), RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) { Icon(icon, null, tint = color, modifier = Modifier.size(25.dp)) }
-        Spacer(Modifier.height(8.dp))
-        Text(label, color = White, fontWeight = FontWeight.SemiBold, fontSize = 10.sp, maxLines = 2, lineHeight = 12.sp)
+@Composable private fun CategoryPill(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, accent: Color, onClick: () -> Unit) {
+    Row(Modifier.border(1.dp, accent.copy(alpha = .45f), RoundedCornerShape(14.dp))
+        .background(Color(0xFF192237), RoundedCornerShape(14.dp))
+        .clickable { onClick() }.padding(horizontal = 15.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+        Icon(icon, null, tint = accent, modifier = Modifier.size(21.dp))
+        Text(label, color = White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
     }
 }
 @Composable private fun ChannelRow(c: Channel, favorite: Boolean, play: () -> Unit, toggle: () -> Unit) {
