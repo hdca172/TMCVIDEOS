@@ -116,17 +116,12 @@ private fun TmcApp(activity: MainActivity) {
             when (screen) {
                 "Inicio" -> LazyColumn(contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
-                        Text("TU ENTRETENIMIENTO", color = Gold, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
+                        Text("BIENVENIDO A TMCVIDEOS", color = Color(0xFF8FA4C9), fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 2.sp)
                         Spacer(Modifier.height(5.dp))
-                        Text("Descubre qué ver hoy", color = White, fontWeight = FontWeight.Black, fontSize = 26.sp)
+                        Text("El entretenimiento empieza aquí.", color = White, fontWeight = FontWeight.Black, fontSize = 26.sp, lineHeight = 31.sp)
                         Spacer(Modifier.height(14.dp))
                         HeroCard { categoryFilter = "Todos"; searching = ""; screen = "TV en vivo" }
                         Spacer(Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            MetricCard("${channels.size}", "CANALES", Icons.Default.LiveTv, Modifier.weight(1f))
-                            MetricCard("${favorites.size}", "FAVORITOS", Icons.Default.Favorite, Modifier.weight(1f))
-                            MetricCard("${history.size}", "RECIENTES", Icons.Default.History, Modifier.weight(1f))
-                        }
                         Spacer(Modifier.height(12.dp))
                         NeonCard {
                             Row(Modifier.fillMaxWidth().clickable { screen = "Listas M3U" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -142,17 +137,16 @@ private fun TmcApp(activity: MainActivity) {
                             }
                         }
                         Spacer(Modifier.height(16.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Explora por categoría", color = White, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            TextButton(onClick = { categoryFilter = "Todos"; searching = ""; screen = "TV en vivo" }) { Text("Ver todo", color = Gold) }
+                        Text("Explora géneros", color = White, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                        Spacer(Modifier.height(11.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            GenreCard("DEPORTES", "En acción", Icons.Default.SportsSoccer, Color(0xFF126A66), Modifier.weight(1f)) { categoryFilter = "Deportes"; searching = ""; screen = "TV en vivo" }
+                            GenreCard("NOTICIAS", "Al instante", Icons.Default.Newspaper, Color(0xFF243D88), Modifier.weight(1f)) { categoryFilter = "Noticias"; searching = ""; screen = "TV en vivo" }
                         }
-                        Text("Encuentra transmisiones según tus intereses", color = Color(0xFF9DAAC5), fontSize = 12.sp)
-                        Spacer(Modifier.height(10.dp))
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                            CategoryPill("Deportes", Icons.Default.SportsSoccer, Color(0xFF39DDA0)) { categoryFilter = "Deportes"; searching = ""; screen = "TV en vivo" }
-                            CategoryPill("Noticias", Icons.Default.Newspaper, Blue) { categoryFilter = "Noticias"; searching = ""; screen = "TV en vivo" }
-                            CategoryPill("Música", Icons.Default.MusicNote, Color(0xFFBB80FF)) { categoryFilter = "Música"; searching = ""; screen = "TV en vivo" }
-                            CategoryPill("Infantil", Icons.Default.ChildCare, Color(0xFFFFB55D)) { categoryFilter = "Infantil"; searching = ""; screen = "TV en vivo" }
+                        Spacer(Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            GenreCard("MÚSICA", "A tu ritmo", Icons.Default.MusicNote, Color(0xFF6B2B78), Modifier.weight(1f)) { categoryFilter = "Música"; searching = ""; screen = "TV en vivo" }
+                            GenreCard("INFANTIL", "Para disfrutar", Icons.Default.ChildCare, Color(0xFF835027), Modifier.weight(1f)) { categoryFilter = "Infantil"; searching = ""; screen = "TV en vivo" }
                         }
                         Spacer(Modifier.height(18.dp))
                         if (history.isNotEmpty()) {
@@ -177,7 +171,7 @@ private fun TmcApp(activity: MainActivity) {
                         }
                         NeonCard { Row(Modifier.fillMaxWidth().clickable { searching = ""; screen = "Historial" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.History, null, tint = Gold); Spacer(Modifier.width(12.dp)); Text("Historial de reproducción", color = White, modifier = Modifier.weight(1f)); Text("${history.size}", color = Color.LightGray) } }
                         Spacer(Modifier.height(16.dp))
-                        SectionTitle("Canales destacados")
+                        SectionTitle("En tu biblioteca")
                         if (channels.isEmpty()) EmptyState("Agrega una lista M3U para mostrar tus canales")
                     }
                     items(channels.takeLast(8).reversed()) { ChannelRow(it, favorites.contains(it.url), { play(it) }, { toggleFavorite(it) }) }
@@ -336,33 +330,33 @@ private fun TmcApp(activity: MainActivity) {
     }
 }
 @Composable private fun HeroCard(onClick: () -> Unit) {
-    Box(
-        Modifier.fillMaxWidth().height(190.dp)
-            .border(1.dp, Color(0xFF41558B), RoundedCornerShape(20.dp))
-            .background(
-                Brush.linearGradient(listOf(Color(0xFF112B60), Color(0xFF241E52), Color(0xFF5E193A))),
-                RoundedCornerShape(20.dp)
-            ).clickable { onClick() }.padding(20.dp)
-    ) {
-        Column(Modifier.align(Alignment.CenterStart).fillMaxWidth(.75f)) {
-            Text(
-                "● TRANSMISIONES EN DIRECTO", color = Color(0xFFB9FCE1),
-                fontSize = 10.sp, fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(10.dp))
-            Text("TV EN VIVO", color = White, fontWeight = FontWeight.Black, fontSize = 30.sp)
-            Text("Tus canales favoritos, siempre a mano.", color = Color(0xFFE1E5F3), fontSize = 12.sp)
+    Box(Modifier.fillMaxWidth().height(245.dp)
+        .border(1.dp, Color(0xFF3C496B), RoundedCornerShape(23.dp))
+        .background(Brush.linearGradient(listOf(Color(0xFF17264A), Color(0xFF30224B), Color(0xFF7A2845))), RoundedCornerShape(23.dp))
+        .clickable { onClick() }.padding(22.dp)) {
+        Icon(Icons.Default.LiveTv, null, tint = White.copy(alpha = .11f), modifier = Modifier.align(Alignment.TopEnd).size(140.dp))
+        Column(Modifier.align(Alignment.BottomStart)) {
+            Text("● EN DIRECTO", color = Color(0xFF92FFD6), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("UNA NUEVA FORMA\nDE VER TV", color = White, fontWeight = FontWeight.Black, fontSize = 29.sp, lineHeight = 32.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("Explora tus canales en un solo lugar.", color = Color(0xFFE5E8F6), fontSize = 12.sp)
             Spacer(Modifier.height(17.dp))
-            Box(
-                Modifier.background(Red, RoundedCornerShape(10.dp))
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            ) { Text("EXPLORAR CANALES  ›", color = White, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+            Row(Modifier.background(White, RoundedCornerShape(11.dp)).padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.PlayArrow, null, tint = Color(0xFF171C33), modifier = Modifier.size(19.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("VER CANALES", color = Color(0xFF171C33), fontSize = 12.sp, fontWeight = FontWeight.Black)
+            }
         }
-        Box(
-            Modifier.align(Alignment.CenterEnd).size(66.dp)
-                .background(White.copy(alpha = .12f), RoundedCornerShape(50)),
-            contentAlignment = Alignment.Center
-        ) { Icon(Icons.Default.PlayArrow, null, tint = White, modifier = Modifier.size(43.dp)) }
+    }
+}
+@Composable private fun GenreCard(label: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) {
+    Box(modifier.height(128.dp).background(Brush.linearGradient(listOf(color, Color(0xFF1B243B))), RoundedCornerShape(17.dp)).clickable { onClick() }.padding(15.dp)) {
+        Icon(icon, null, tint = White.copy(alpha = .55f), modifier = Modifier.align(Alignment.TopEnd).size(34.dp))
+        Column(Modifier.align(Alignment.BottomStart)) {
+            Text(label, color = White, fontWeight = FontWeight.Black, fontSize = 15.sp)
+            Text(subtitle, color = Color(0xFFD1D8E8), fontSize = 11.sp)
+        }
     }
 }
 @Composable private fun CategoryPill(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, accent: Color, onClick: () -> Unit) {
