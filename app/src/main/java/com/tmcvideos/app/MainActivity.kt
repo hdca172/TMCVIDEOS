@@ -598,6 +598,7 @@ private fun TmcApp(activity: MainActivity) {
     var volume by remember(c.url) { mutableFloatStateOf(1f) }
     var muted by remember(c.url) { mutableStateOf(false) }
     var trackInfo by remember(c.url) { mutableStateOf("Buscando formatos compatibles...") }
+    var mp2Unsupported by remember(c.url) { mutableStateOf(false) }
     var fullscreen by remember(c.url) { mutableStateOf(false) }
     var playerReady by remember(c.url) { mutableStateOf(false) }
     var isBuffering by remember(c.url) { mutableStateOf(false) }
@@ -611,6 +612,11 @@ private fun TmcApp(activity: MainActivity) {
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
                 trackInfo = audioGroups.flatMap { group -> (0 until group.length).map { index -> group.getTrackFormat(index).sampleMimeType ?: "Desconocido" } }.distinct().joinToString(", ").ifBlank { "Sin pistas de audio" }
+                mp2Unsupported = audioGroups.any { group -> (0 until group.length).any { index ->
+                    val format = group.getTrackFormat(index)
+                    val isMp2 = format.sampleMimeType == "audio/mpeg-L2" || format.codecs?.contains("mp2", ignoreCase = true) == true
+                    isMp2 && !group.isTrackSupported(index)
+                } }
                 audioStatus = when {
                     audioGroups.isEmpty() -> "Esta transmisión no anuncia una pista de audio. Puede ser una fuente sin sonido."
                     audioGroups.none { group -> (0 until group.length).any { group.isTrackSupported(it) } } -> "El dispositivo no admite el formato de audio de esta transmisión."
@@ -658,6 +664,19 @@ private fun TmcApp(activity: MainActivity) {
                 Text(audioStatus, color = Color.LightGray, fontSize = 12.sp)
                 Text("Formato de audio: " + trackInfo, color = Color(0xFF9DACCB), fontSize = 12.sp)
             }
+            if (mp2Unsupported) Text("Audio MPEG Layer II (MP2) detectado: este dispositivo no dispone de un decodificador compatible en el reproductor integrado. Prueba un reproductor externo.", color = Gold, fontSize = 13.sp)
+            OutlinedButton(onClick = {
+                try {
+                    val external = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(Uri.parse(c.url), "video/*")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(external, "Reproducir con otra aplicación"))
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Instala VLC u otro reproductor compatible con el enlace.", Toast.LENGTH_LONG).show()
+                }
+            }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text("Abrir en reproductor externo (VLC)") }
+            Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = { playbackError = null; player.prepare(); player.play() }) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("Reintentar reproducción") }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { muted = !muted; player.volume = if (muted) volume else 0f }) {
