@@ -35,6 +35,8 @@ import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URL
+import java.net.HttpURLConnection
+import java.net.URI
 import java.util.UUID
 
 private val Back = Color(0xFF050712)
@@ -71,8 +73,9 @@ private fun TmcApp(activity: MainActivity) {
     val favorites = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("favorites", "") ?: "").split("\n").filter(String::isNotBlank)) } }
     val history = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("history", "") ?: "").split("\n").filter(String::isNotBlank)) } }
     fun savePlaylist(list: List<Channel>) {
-        channels = list.distinctBy { it.url }
-        prefs.edit().putString("playlist", exportM3u(list)).apply()
+        val unique = list.distinctBy { it.url }
+        channels = unique
+        prefs.edit().putString("playlist", exportM3u(unique)).apply()
     }
     fun play(c: Channel) {
         selected = c
@@ -123,7 +126,7 @@ private fun TmcApp(activity: MainActivity) {
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text("Agregar lista M3U", color = White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                                    Text("Importa desde archivo o enlace HTTPS", color = Color.LightGray, fontSize = 12.sp)
+                                    Text("Importa desde archivo o enlace HTTP/HTTPS", color = Color.LightGray, fontSize = 12.sp)
                                 }
                                 Icon(Icons.Default.ChevronRight, null, tint = Gold)
                             }
@@ -185,20 +188,20 @@ private fun TmcApp(activity: MainActivity) {
                     SectionTitle("Mis listas de reproducción")
                     Text("Añade tus propias listas M3U/M3U8 autorizadas para ver los canales.", color = Color.LightGray, fontSize = 13.sp)
                     NeonCard { Row(Modifier.fillMaxWidth().clickable { importFile.launch("*/*") }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.FileOpen, null, tint = Blue); Spacer(Modifier.width(12.dp)); Text("Importar archivo .m3u / .m3u8", color = White) } }
-                    OutlinedTextField(urlInput, { urlInput = it }, label = { Text("URL de lista M3U (HTTPS)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    OutlinedTextField(urlInput, { urlInput = it }, label = { Text("URL de lista M3U (HTTP o HTTPS)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     Button(onClick = {
                         val candidate = urlInput.trim()
-                        if (!candidate.startsWith("https://")) { message = "Utiliza un enlace HTTPS válido"; return@Button }
+                        if (!isWebUrl(candidate)) { message = "Introduce un enlace HTTP o HTTPS válido"; return@Button }
                         busy = true
                     }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Importando..." else "Importar desde URL") }
                     LaunchedEffect(busy) {
                         if (busy) {
                             try {
-                                val content = withContext(Dispatchers.IO) { URL(urlInput.trim()).openConnection().apply { connectTimeout = 10000; readTimeout = 15000 }.getInputStream().bufferedReader().use { it.readText() } }
+                                val content = withContext(Dispatchers.IO) { downloadPlaylist(urlInput.trim()) }
                                 val found = readChannels(content)
                                 if (found.isEmpty()) message = "La URL no contiene canales reconocidos"
                                 else { savePlaylist(channels + found); message = "Importados ${found.size} canales" }
-                            } catch (_: Exception) { message = "No se pudo descargar la lista. Comprueba el enlace y tu conexión." }
+                            } catch (e: Exception) { message = "No se pudo descargar la lista: ${e.localizedMessage ?: "error de conexión"}. Revisa la URL y el servidor." }
                             busy = false
                         }
                     }
@@ -209,8 +212,8 @@ private fun TmcApp(activity: MainActivity) {
                 "Videos" -> Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionTitle("Videos")
                     Button(onClick = { videoFile.launch(arrayOf("video/*")) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.FolderOpen, null); Spacer(Modifier.width(8.dp)); Text("Abrir video de mi teléfono") }
-                    OutlinedTextField(urlInput, { urlInput = it }, modifier = Modifier.fillMaxWidth(), label = { Text("URL HTTPS de video o transmisión") }, singleLine = true)
-                    Button(onClick = { if (urlInput.trim().startsWith("https://")) play(Channel("Video de Internet", urlInput.trim(), "Videos")) else message = "Usa una URL HTTPS" }, modifier = Modifier.fillMaxWidth()) { Text("Reproducir enlace") }
+                    OutlinedTextField(urlInput, { urlInput = it }, modifier = Modifier.fillMaxWidth(), label = { Text("URL HTTP/HTTPS de video o transmisión") }, singleLine = true)
+                    Button(onClick = { if (isWebUrl(urlInput.trim())) play(Channel("Video de Internet", urlInput.trim(), "Videos")) else message = "Usa una URL HTTP o HTTPS válida" }, modifier = Modifier.fillMaxWidth()) { Text("Reproducir enlace") }
                     Text("Los archivos elegidos se reproducen localmente. Usa solo enlaces y contenido autorizados.", color = Color.Gray, fontSize = 12.sp)
                 }
                 "Reproductor" -> selected?.let { c -> PlayerScreen(c) { toggleFavorite(c) } }
@@ -287,7 +290,7 @@ private fun TmcApp(activity: MainActivity) {
     val player = remember(c.url) { ExoPlayer.Builder(context).build().apply {
         addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                playbackError = "No se pudo reproducir este contenido. Revisa el enlace, los permisos o el formato."
+                playbackError = "Error de reproducción (${error.errorCodeName}): ${error.cause?.localizedMessage ?: error.localizedMessage ?: "origen o formato incompatible"}"
             }
         })
         setMediaItem(MediaItem.fromUri(Uri.parse(c.url))); prepare(); playWhenReady = true
@@ -317,7 +320,7 @@ private fun readChannels(m3u: String): List<Channel> {
         when {
             line.startsWith("#EXTINF", true) -> {
                 name = line.substringAfterLast(',', "Canal").trim().ifBlank { "Canal" }
-                group = Regex("group-title=\"([^\"]+)\"").find(line)?.groupValues?.get(1) ?: "General"
+                group = Regex("group-title=[\\\"]([^\\\"]+)[\\\"]", RegexOption.IGNORE_CASE).find(line)?.groupValues?.get(1) ?: "General"
             }
             !line.startsWith("#") && (line.startsWith("https://") || line.startsWith("http://")) -> {
                 if (output.size < 5000) output.add(Channel(name, line, group))
@@ -333,4 +336,30 @@ private fun exportM3u(channels: List<Channel>): String = buildString {
         append("#EXTINF:-1 group-title=\"").append(c.group.replace("\"", "")).append("\",").append(c.name.replace("\n", " ")).append("\n")
         append(c.url).append("\n")
     }
+}
+
+private fun isWebUrl(raw: String): Boolean = try {
+    val uri = URI(raw)
+    (uri.scheme.equals("http", true) || uri.scheme.equals("https", true)) && !uri.host.isNullOrBlank()
+} catch (_: Exception) { false }
+
+private fun downloadPlaylist(raw: String): String {
+    require(isWebUrl(raw)) { "URL HTTP/HTTPS inválida" }
+    val connection = URL(raw).openConnection().apply {
+        connectTimeout = 15000
+        readTimeout = 25000
+        setRequestProperty("User-Agent", "TMCVIDEOS/2.0 Android")
+        setRequestProperty("Accept", "application/x-mpegURL, application/vnd.apple.mpegurl, text/plain, */*")
+    }
+    return try {
+        if (connection is HttpURLConnection) {
+            val status = connection.responseCode
+            if (status !in 200..299) throw IllegalStateException("HTTP $status (${connection.responseMessage})")
+        }
+        connection.getInputStream().bufferedReader(Charsets.UTF_8).use { reader ->
+            val content = reader.readText()
+            require(content.length <= 10_000_000) { "La lista supera el límite de 10 MB" }
+            content.removePrefix("\\uFEFF")
+        }
+    } finally { (connection as? HttpURLConnection)?.disconnect() }
 }
