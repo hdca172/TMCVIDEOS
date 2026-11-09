@@ -396,9 +396,21 @@ private fun TmcApp(activity: MainActivity) {
                     Text("Los archivos elegidos se reproducen localmente. Usa solo enlaces y contenido autorizados.", color = Color.Gray, fontSize = 12.sp)
                 }
                 "Reproductor" -> selected?.let { c -> PlayerScreen(c, autoplay, diagnostics) { toggleFavorite(c) } }
+                "Ayuda" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    SectionTitle("Ayuda")
+                    Text("Para ver TV en vivo, importa una lista M3U desde un archivo o una URL autorizada.", color = White)
+                    Text("Si un canal no tiene sonido, abre el reproductor y utiliza Compartir diagnóstico de audio. Puedes probar Abrir en reproductor externo.", color = Color.LightGray)
+                    Button(onClick = { screen = "Listas M3U" }) { Text("Administrar listas M3U") }
+                }
+                "Acerca de" -> Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    SectionTitle("Acerca de TMCVIDEOS")
+                    Text("Todo en Videos en un Solo Lugar", color = White)
+                    Text("Versión 2.0 · Android · Media3", color = Color.LightGray)
+                    Text("La aplicación reproduce contenido local y transmisiones de fuentes añadidas por el usuario.", color = Color.LightGray)
+                }
                 "Ajustes" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionTitle("⚙  Configuración")
-                    Text("Preferencias de reproducción", color = Gold, fontWeight = FontWeight.Bold)
+                    Text("Reproductor", color = Gold, fontWeight = FontWeight.Bold)
                     NeonCard {
                         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
@@ -423,6 +435,8 @@ private fun TmcApp(activity: MainActivity) {
                     OutlinedButton(onClick = { searching = ""; screen = "Favoritos" }, modifier = Modifier.fillMaxWidth()) { Text("Ver favoritos") }
                     OutlinedButton(onClick = { history.clear(); prefs.edit().remove("history").apply(); message = "Historial eliminado" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar historial") }
                     OutlinedButton(onClick = { favorites.clear(); prefs.edit().remove("favorites").apply(); message = "Favoritos eliminados" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar favoritos") }
+                    OutlinedButton(onClick = { screen = "Ayuda" }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.HelpOutline, null); Spacer(Modifier.width(8.dp)); Text("Ayuda") }
+                    OutlinedButton(onClick = { screen = "Acerca de" }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.InfoOutline, null); Spacer(Modifier.width(8.dp)); Text("Acerca de") }
                     Text("TMCVIDEOS · Versión 2.0 · Media3", color = Color.Gray, fontSize = 12.sp)
                 }
             }
@@ -437,13 +451,13 @@ private fun TmcApp(activity: MainActivity) {
                             Text("TMC", color = White, fontWeight = FontWeight.Black, fontSize = 22.sp)
                             Text("VIDEOS", color = Red, fontWeight = FontWeight.Black, fontSize = 22.sp)
                         }
-                        listOf("Inicio", "Explorar", "TV en vivo", "Videos", "Favoritos", "Historial", "Listas M3U", "Ajustes").forEach { destination ->
+                        listOf("Inicio", "Explorar", "TV en vivo", "Videos", "Favoritos", "Historial", "Listas M3U", "Ajustes", "Ayuda", "Acerca de").forEach { destination ->
                             val active = screen == destination
                             Row(Modifier.fillMaxWidth()
                                 .background(if (active) Brush.horizontalGradient(listOf(Red, Color(0xFF36131B))) else Brush.horizontalGradient(listOf(Color(0xFF101015), Color(0xFF101015))))
                                 .clickable { showMenu = false; screen = destination }
                                 .padding(horizontal = 21.dp, vertical = 17.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(when(destination) { "Inicio" -> Icons.Default.Home; "Explorar" -> Icons.Default.Explore; "TV en vivo" -> Icons.Default.LiveTv; "Videos" -> Icons.Default.VideoLibrary; "Favoritos" -> Icons.Default.Favorite; "Historial" -> Icons.Default.History; "Listas M3U" -> Icons.Default.PlaylistPlay; else -> Icons.Default.Settings }, null, tint = White)
+                                Icon(when(destination) { "Inicio" -> Icons.Default.Home; "Explorar" -> Icons.Default.Explore; "TV en vivo" -> Icons.Default.LiveTv; "Videos" -> Icons.Default.VideoLibrary; "Favoritos" -> Icons.Default.Favorite; "Historial" -> Icons.Default.History; "Listas M3U" -> Icons.Default.PlaylistPlay; "Ayuda" -> Icons.Default.HelpOutline; "Acerca de" -> Icons.Default.InfoOutline; else -> Icons.Default.Settings }, null, tint = White)
                                 Spacer(Modifier.width(18.dp))
                                 Text(destination, color = White, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, fontSize = 16.sp)
                             }
