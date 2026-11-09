@@ -31,6 +31,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -579,9 +581,16 @@ private fun TmcApp(activity: MainActivity) {
     var volume by remember(c.url) { mutableFloatStateOf(1f) }
     var muted by remember(c.url) { mutableStateOf(false) }
     var trackInfo by remember(c.url) { mutableStateOf("Buscando formatos compatibles...") }
+    var fullscreen by remember(c.url) { mutableStateOf(false) }
+    var playerReady by remember(c.url) { mutableStateOf(false) }
+    var isBuffering by remember(c.url) { mutableStateOf(false) }
     val player = remember(c.url) { ExoPlayer.Builder(context).build().apply {
         volume = 1f
         addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                playerReady = playbackState == Player.STATE_READY
+                isBuffering = playbackState == Player.STATE_BUFFERING
+            }
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
                 trackInfo = audioGroups.flatMap { group -> (0 until group.length).map { index -> group.getTrackFormat(index).sampleMimeType ?: "Desconocido" } }.distinct().joinToString(", ").ifBlank { "Sin pistas de audio" }
@@ -608,8 +617,20 @@ private fun TmcApp(activity: MainActivity) {
         prepare(); playWhenReady = autoplay
     } }
     DisposableEffect(player) { onDispose { player.release() } }
+    if (fullscreen) Dialog(onDismissRequest = { fullscreen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(Modifier.fillMaxWidth().background(Color.Black)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IconButton(onClick = { fullscreen = false }) { Icon(Icons.Default.FullscreenExit, "Salir de pantalla completa", tint = White) }
+            }
+            AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxWidth().height(270.dp))
+        }
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxWidth().height(240.dp))
+        if (!fullscreen) AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxWidth().height(240.dp))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(when { isBuffering -> "Cargando transmisión..."; playerReady -> "Reproducción preparada"; else -> "Conectando..." }, color = Color.LightGray, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            IconButton(onClick = { fullscreen = true }) { Icon(Icons.Default.Fullscreen, "Pantalla completa", tint = White) }
+        }
         Column(Modifier.padding(16.dp)) {
             Text(c.name, color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp)); Text(c.group, color = Color.LightGray)
