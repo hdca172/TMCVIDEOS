@@ -55,9 +55,9 @@ import java.net.URI
 import java.util.UUID
 
 private val Back = Color(0xFF050508)
-private val Surface = Color(0xFF121217)
+private val Surface = Color(0xFF111116)
 private val Gold = Color(0xFFFFCD35)
-private val Red = Color(0xFFFF3158)
+private val Red = Color(0xFFF00927)
 private val Blue = Color(0xFF447BFF)
 private val Purple = Color(0xFF9E3DFF)
 private val White = Color(0xFFF5F7FF)
@@ -476,7 +476,7 @@ private fun TmcApp(activity: MainActivity) {
             if (showDeleteConfirmation) AlertDialog(onDismissRequest = { showDeleteConfirmation = false }, title = { Text("Eliminar canales") }, text = { Text("Se eliminarán los canales importados de este dispositivo. ¿Continuar?") }, confirmButton = { TextButton(onClick = { savePlaylist(emptyList()); showDeleteConfirmation = false; message = "Canales eliminados" }) { Text("Eliminar") } }, dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancelar") } })
             if (message.isNotBlank()) AlertDialog(onDismissRequest = { message = "" }, title = { Text("TMCVIDEOS") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { message = "" }) { Text("Aceptar") } })
         }
-        NavigationBar(containerColor = Color(0xFF111728), tonalElevation = 0.dp) {
+        NavigationBar(containerColor = Color.Black, tonalElevation = 0.dp) {
             listOf(Triple("Inicio", Icons.Default.Home, "Inicio"), Triple("TV", Icons.Default.LiveTv, "TV en vivo"), Triple("Listas", Icons.Default.PlaylistAdd, "Listas M3U"), Triple("Favoritos", Icons.Default.FavoriteBorder, "Favoritos"), Triple("Ajustes", Icons.Default.Settings, "Ajustes")).forEach { (label, icon, target) ->
                 NavigationBarItem(selected = screen == target, onClick = { if (target == "TV en vivo") { categoryFilter = "Todos"; searching = "" }; if (target == "Favoritos") searching = ""; screen = target }, icon = { Icon(icon, label) }, label = { Text(label, fontSize = 10.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Red, selectedTextColor = Red, unselectedIconColor = White, unselectedTextColor = White))
             }
