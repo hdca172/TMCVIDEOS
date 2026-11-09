@@ -42,6 +42,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.net.URL
 import java.net.HttpURLConnection
@@ -93,6 +95,7 @@ private fun TmcApp(activity: MainActivity) {
     var editGroup by remember { mutableStateOf("") }
     var editUrl by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val playlistSaveMutex = remember { Mutex() }
     var autoplay by remember { mutableStateOf(prefs.getBoolean("autoplay", true)) }
     var diagnostics by remember { mutableStateOf(prefs.getBoolean("diagnostics", true)) }
     val favorites = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("favorites", "") ?: "").split("\n").filter(String::isNotBlank)) } }
@@ -101,8 +104,12 @@ private fun TmcApp(activity: MainActivity) {
         val unique = list.distinctBy { it.url }
         channels = unique
         scope.launch {
-            val serialized = withContext(Dispatchers.Default) { exportM3u(unique) }
-            withContext(Dispatchers.IO) { prefs.edit().putString("playlist", serialized).commit() }
+            playlistSaveMutex.withLock {
+                val latest = channels
+                val serialized = withContext(Dispatchers.Default) { exportM3u(latest) }
+                val saved = withContext(Dispatchers.IO) { prefs.edit().putString("playlist", serialized).commit() }
+                if (!saved) message = "No se pudo guardar la lista en el dispositivo"
+            }
         }
     }
     fun play(c: Channel) {
@@ -142,8 +149,18 @@ private fun TmcApp(activity: MainActivity) {
     }
     val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/x-mpegurl")) { uri ->
         if (uri != null) {
-            try { activity.contentResolver.openOutputStream(uri)?.use { it.write(exportM3u(channels).toByteArray()) }; message = "Lista exportada" }
-            catch (e: Exception) { message = "Error al exportar" }
+            scope.launch {
+                busy = true
+                try {
+                    val snapshot = channels
+                    withContext(Dispatchers.IO) {
+                        val output = activity.contentResolver.openOutputStream(uri) ?: error("No se pudo abrir el destino")
+                        output.bufferedWriter(Charsets.UTF_8).use { it.write(exportM3u(snapshot)) }
+                    }
+                    message = "Lista exportada"
+                } catch (e: Exception) { message = "Error al exportar: " + (e.localizedMessage ?: "desconocido") }
+                finally { busy = false }
+            }
         }
     }
     fun navigateBack() {
@@ -346,7 +363,7 @@ private fun TmcApp(activity: MainActivity) {
                         if (channels.size > 100) Text("Se muestran los primeros 100 canales para editar.", color = Color.LightGray, fontSize = 12.sp)
                     }
                     NeonCard { Column(Modifier.padding(14.dp)) { Text("Mi lista", color = White, fontWeight = FontWeight.Bold); Text("${channels.size} canales importados", color = Color.LightGray, fontSize = 12.sp); Text("Las listas se guardan localmente en este dispositivo.", color = Color.Gray, fontSize = 11.sp) } }
-                    Button(onClick = { exportFile.launch("TMCVIDEOS.m3u") }, enabled = channels.isNotEmpty(), modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Red)) { Icon(Icons.Default.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Exportar lista M3U") }
+                    Button(onClick = { exportFile.launch("TMCVIDEOS.m3u") }, enabled = channels.isNotEmpty() && !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Red)) { Icon(Icons.Default.FileUpload, null); Spacer(Modifier.width(8.dp)); Text("Exportar lista M3U") }
                     OutlinedButton(onClick = { showDeleteConfirmation = true }, enabled = channels.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Eliminar canales importados") }
                 }
                 "Videos" -> Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
