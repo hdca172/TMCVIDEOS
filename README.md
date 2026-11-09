@@ -1,4 +1,4 @@
-# TMCVIDEOS — Android V1.0 (prototipo funcional)
+# TMCVIDEOS — Android V2.0 (prototipo funcional)
 
 Aplicación Android nativa con Kotlin, Jetpack Compose y Media3 ExoPlayer.
 
@@ -25,3 +25,14 @@ Este APK de depuración es para pruebas. Una publicación definitiva requiere fi
 - Se conservan una sola colección de canales y preferencias locales; futuras versiones incorporarán varias listas independientes y EPG.
 - La reproducción depende de la disponibilidad, el formato, el cifrado y los permisos de la fuente. No se incluyen canales ni contenidos protegidos de terceros.
 - No se ha compilado el APK en este entorno; GitHub Actions será la comprobación real.
+
+
+## Novedades V2.0
+
+- Filtro por categorías en TV en vivo.
+- Historial para fuentes locales y enlaces externos.
+- Opciones para borrar historial y favoritos.
+- Mensajes de error del reproductor Media3.
+- Detección de canales duplicados al guardar listas.
+
+Esta versión debe compilarse y probarse antes de fusionarla con main.
