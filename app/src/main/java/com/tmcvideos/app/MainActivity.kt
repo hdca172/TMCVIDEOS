@@ -4,6 +4,10 @@ import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
 import android.widget.Toast
+import android.view.SurfaceView
+import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.Media
+import org.videolan.libvlc.MediaPlayer as VlcMediaPlayer
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -681,7 +685,50 @@ private fun TmcApp(activity: MainActivity) {
 }
 @Composable private fun EmptyState(s: String) { Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.TvOff, null, tint = Purple, modifier = Modifier.size(45.dp)); Spacer(Modifier.height(8.dp)); Text(s, color = Color.LightGray, fontSize = 13.sp) } }
 
+@Composable private fun LibVlcSurface(url: String, autoplay: Boolean, modifier: Modifier = Modifier, onError: (String) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val latestError by rememberUpdatedState(onError)
+    val vlc = remember(url) {
+        try {
+            val engine = LibVLC(context, arrayListOf("--network-caching=1500", "--live-caching=1500"))
+            val mediaPlayer = VlcMediaPlayer(engine)
+            Pair(engine, mediaPlayer)
+        } catch (e: Exception) {
+            latestError("No se pudo iniciar LibVLC: " + (e.localizedMessage ?: "error desconocido"))
+            null
+        }
+    }
+    if (vlc == null) {
+        Box(modifier.background(Color.Black), contentAlignment = Alignment.Center) {
+            Text("No se pudo iniciar el motor VLC. Selecciona Media3.", color = White)
+        }
+        return
+    }
+    val mediaPlayer = vlc.second
+    AndroidView(factory = { ctx ->
+        SurfaceView(ctx).apply {
+            mediaPlayer.vlcVout.setVideoView(this)
+            mediaPlayer.vlcVout.attachViews()
+            val media = Media(vlc.first, Uri.parse(url))
+            media.setHWDecoderEnabled(true, false)
+            media.addOption(":network-caching=1500")
+            mediaPlayer.media = media
+            media.release()
+            if (autoplay) mediaPlayer.play()
+        }
+    }, modifier = modifier)
+    DisposableEffect(vlc) {
+        onDispose {
+            mediaPlayer.stop()
+            mediaPlayer.vlcVout.detachViews()
+            mediaPlayer.release()
+            vlc.first.release()
+        }
+    }
+}
 @Composable private fun PlayerScreen(c: Channel, autoplay: Boolean, diagnostics: Boolean, toggle: () -> Unit) {
+    var useVlc by remember(c.url) { mutableStateOf(true) }
+    var vlcError by remember(c.url) { mutableStateOf<String?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     var playbackError by remember(c.url) { mutableStateOf<String?>(null) }
     var audioStatus by remember(c.url) { mutableStateOf("Comprobando pista de audio...") }
@@ -743,16 +790,21 @@ private fun TmcApp(activity: MainActivity) {
         prepare(); playWhenReady = autoplay
     } }
     DisposableEffect(player) { onDispose { player.release() } }
+    LaunchedEffect(useVlc, player) { if (useVlc) player.pause() else { player.prepare(); if (autoplay) player.play() } }
     if (fullscreen) Dialog(onDismissRequest = { fullscreen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxWidth().background(Color.Black)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 IconButton(onClick = { fullscreen = false }) { Icon(Icons.Default.FullscreenExit, "Salir de pantalla completa", tint = White) }
             }
-            AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxWidth().height(270.dp))
+            if (useVlc) LibVlcSurface(c.url, autoplay, Modifier.fillMaxWidth().height(270.dp), onError = { vlcError = it })
+            else AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxWidth().height(270.dp))
         }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        if (!fullscreen) AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxWidth().height(240.dp))
+        if (!fullscreen) {
+            if (useVlc) LibVlcSurface(c.url, autoplay, Modifier.fillMaxWidth().height(240.dp), onError = { vlcError = it })
+            else AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxWidth().height(240.dp))
+        }
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(when { isBuffering -> "Cargando transmisión..."; playerReady -> "Reproducción preparada"; else -> "Conectando..." }, color = Color.LightGray, fontSize = 12.sp, modifier = Modifier.weight(1f))
             IconButton(onClick = { fullscreen = true }) { Icon(Icons.Default.Fullscreen, "Pantalla completa", tint = White) }
@@ -760,10 +812,15 @@ private fun TmcApp(activity: MainActivity) {
         Column(Modifier.padding(16.dp)) {
             Text(c.name, color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp)); Text(c.group, color = Color.LightGray)
-            if (playbackError != null) Text(playbackError!!, color = Red, fontSize = 13.sp)
+            if (!useVlc && playbackError != null) Text(playbackError!!, color = Red, fontSize = 13.sp)
+            if (useVlc && vlcError != null) Text(vlcError!!, color = Red, fontSize = 13.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { useVlc = true }, enabled = !useVlc) { Text("Motor VLC") }
+                OutlinedButton(onClick = { useVlc = false }, enabled = useVlc) { Text("Motor Media3") }
+            }
             Spacer(Modifier.height(12.dp))
             Text("Audio", color = White, fontWeight = FontWeight.Bold)
-            if (diagnostics) {
+            if (diagnostics && !useVlc) {
                 Text(audioStatus, color = Color.LightGray, fontSize = 12.sp)
                 Text("Formato de audio: " + trackInfo, color = Color(0xFF9DACCB), fontSize = 12.sp)
                 Text(audioDetail, color = Color(0xFF9DACCB), fontSize = 12.sp)
@@ -773,7 +830,7 @@ private fun TmcApp(activity: MainActivity) {
                     context.startActivity(Intent.createChooser(send, "Compartir diagnóstico"))
                 }) { Icon(Icons.Default.BugReport, null); Spacer(Modifier.width(6.dp)); Text("Compartir diagnóstico de audio") }
             }
-            if (mp2Unsupported) Text("Audio MPEG Layer II (MP2) detectado: este dispositivo no dispone de un decodificador compatible en el reproductor integrado. Prueba un reproductor externo.", color = Gold, fontSize = 13.sp)
+            if (mp2Unsupported && !useVlc) Text("Audio MPEG Layer II (MP2) detectado: este dispositivo no dispone de un decodificador compatible en el reproductor integrado. Prueba un reproductor externo.", color = Gold, fontSize = 13.sp)
             OutlinedButton(onClick = {
                 try {
                     val external = Intent(Intent.ACTION_VIEW).apply {
@@ -786,8 +843,8 @@ private fun TmcApp(activity: MainActivity) {
                 }
             }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text("Abrir en reproductor externo (VLC)") }
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = { playbackError = null; player.prepare(); player.play() }) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("Reintentar reproducción") }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { if (useVlc) { useVlc = false; useVlc = true } else { playbackError = null; player.prepare(); player.play() } }) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("Reintentar reproducción") }
+            if (!useVlc) Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { muted = !muted; player.volume = if (muted) volume else 0f }) {
                     Icon(if (muted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, if (muted) "Activar sonido" else "Silenciar", tint = White)
                 }
