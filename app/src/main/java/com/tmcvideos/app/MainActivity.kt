@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
@@ -565,11 +566,13 @@ private fun TmcApp(activity: MainActivity) {
     var audioStatus by remember(c.url) { mutableStateOf("Comprobando pista de audio...") }
     var volume by remember(c.url) { mutableFloatStateOf(1f) }
     var muted by remember(c.url) { mutableStateOf(false) }
+    var trackInfo by remember(c.url) { mutableStateOf("Buscando formatos compatibles...") }
     val player = remember(c.url) { ExoPlayer.Builder(context).build().apply {
         volume = 1f
         addListener(object : Player.Listener {
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+                trackInfo = audioGroups.flatMap { group -> (0 until group.length).map { index -> group.getTrackFormat(index).sampleMimeType ?: "Desconocido" } }.distinct().joinToString(", ").ifBlank { "Sin pistas de audio" }
                 audioStatus = when {
                     audioGroups.isEmpty() -> "Esta transmisión no anuncia una pista de audio. Puede ser una fuente sin sonido."
                     audioGroups.none { group -> (0 until group.length).any { group.isTrackSupported(it) } } -> "El dispositivo no admite el formato de audio de esta transmisión."
@@ -581,7 +584,16 @@ private fun TmcApp(activity: MainActivity) {
                 playbackError = "Error de reproducción (${error.errorCodeName}): ${error.cause?.localizedMessage ?: error.localizedMessage ?: "origen o formato incompatible"}"
             }
         })
-        setMediaItem(MediaItem.fromUri(Uri.parse(c.url))); prepare(); playWhenReady = autoplay
+        val uri = Uri.parse(c.url)
+        val path = uri.path.orEmpty().lowercase()
+        val mime = when {
+            path.endsWith(".m3u8") -> MimeTypes.APPLICATION_M3U8
+            path.endsWith(".mpd") -> MimeTypes.APPLICATION_MPD
+            path.endsWith(".mp4") || path.endsWith(".m4v") -> MimeTypes.VIDEO_MP4
+            else -> null
+        }
+        setMediaItem(MediaItem.Builder().setUri(uri).apply { if (mime != null) setMimeType(mime) }.build())
+        prepare(); playWhenReady = autoplay
     } }
     DisposableEffect(player) { onDispose { player.release() } }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -592,7 +604,11 @@ private fun TmcApp(activity: MainActivity) {
             if (playbackError != null) Text(playbackError!!, color = Red, fontSize = 13.sp)
             Spacer(Modifier.height(12.dp))
             Text("Audio", color = White, fontWeight = FontWeight.Bold)
-            if (diagnostics) Text(audioStatus, color = Color.LightGray, fontSize = 12.sp)
+            if (diagnostics) {
+                Text(audioStatus, color = Color.LightGray, fontSize = 12.sp)
+                Text("Formato de audio: " + trackInfo, color = Color(0xFF9DACCB), fontSize = 12.sp)
+            }
+            OutlinedButton(onClick = { playbackError = null; player.prepare(); player.play() }) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(6.dp)); Text("Reintentar reproducción") }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { muted = !muted; player.volume = if (muted) volume else 0f }) {
                     Icon(if (muted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, if (muted) "Activar sonido" else "Silenciar", tint = White)
