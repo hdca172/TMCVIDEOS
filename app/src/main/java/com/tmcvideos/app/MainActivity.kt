@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -171,10 +172,50 @@ private fun TmcApp(activity: MainActivity) {
                         }
                         NeonCard { Row(Modifier.fillMaxWidth().clickable { searching = ""; screen = "Historial" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.History, null, tint = Gold); Spacer(Modifier.width(12.dp)); Text("Historial de reproducción", color = White, modifier = Modifier.weight(1f)); Text("${history.size}", color = Color.LightGray) } }
                         Spacer(Modifier.height(16.dp))
-                        SectionTitle("En tu biblioteca")
-                        if (channels.isEmpty()) EmptyState("Agrega una lista M3U para mostrar tus canales")
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Canales para ti", color = White, fontSize = 21.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { categoryFilter = "Todos"; searching = ""; screen = "TV en vivo" }) { Text("Ver todos", color = Gold) }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        if (channels.isEmpty()) {
+                            NeonCard {
+                                Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.Tv, null, tint = Gold, modifier = Modifier.size(38.dp))
+                                    Spacer(Modifier.height(10.dp))
+                                    Text("Tu catálogo comienza aquí", color = White, fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.height(6.dp))
+                                    Text("Importa una lista M3U para mostrar tus canales.", color = Color.LightGray, fontSize = 12.sp)
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(onClick = { screen = "Listas M3U" }) { Text("Importar lista") }
+                                }
+                            }
+                        } else {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                items(channels.take(16), key = { it.url }) { c ->
+                                    PosterChannel(c, favorites.contains(c.url), { play(c) }, { toggleFavorite(c) })
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(18.dp))
+                        if (favorites.isNotEmpty()) {
+                            Text("Tus favoritos", color = White, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                            Spacer(Modifier.height(10.dp))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                items(channels.filter { favorites.contains(it.url) }.take(16), key = { it.url }) { c ->
+                                    PosterChannel(c, true, { play(c) }, { toggleFavorite(c) })
+                                }
+                            }
+                            Spacer(Modifier.height(18.dp))
+                        }
+                        NeonCard {
+                            Row(Modifier.fillMaxWidth().clickable { screen = "Listas M3U" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.PlaylistAdd, null, tint = Gold, modifier = Modifier.size(28.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Text("Administrar listas M3U", color = White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.ChevronRight, null, tint = Gold)
+                            }
+                        }
                     }
-                    items(channels.takeLast(8).reversed()) { ChannelRow(it, favorites.contains(it.url), { play(it) }, { toggleFavorite(it) }) }
                 }
                 "TV en vivo", "Explorar", "Favoritos", "Historial" -> {
                     val list = when (screen) {
@@ -366,6 +407,25 @@ private fun TmcApp(activity: MainActivity) {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         Icon(icon, null, tint = accent, modifier = Modifier.size(21.dp))
         Text(label, color = White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+    }
+}
+@Composable private fun PosterChannel(c: Channel, favorite: Boolean, play: () -> Unit, toggle: () -> Unit) {
+    Column(Modifier.width(155.dp).background(Color(0xFF161E31), RoundedCornerShape(16.dp)).clickable { play() }.padding(7.dp)) {
+        Box(Modifier.fillMaxWidth().height(145.dp)
+            .background(Brush.linearGradient(listOf(Color(0xFF213F78), Color(0xFF48295F), Color(0xFF7A2946))), RoundedCornerShape(12.dp))) {
+            Icon(Icons.Default.LiveTv, null, tint = White.copy(alpha = .22f), modifier = Modifier.align(Alignment.Center).size(70.dp))
+            Box(Modifier.align(Alignment.TopStart).padding(9.dp).background(Red, RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 3.dp)) {
+                Text("EN VIVO", color = White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
+            Icon(Icons.Default.PlayCircle, "Reproducir", tint = White, modifier = Modifier.align(Alignment.Center).size(43.dp))
+            IconButton(onClick = toggle, modifier = Modifier.align(Alignment.TopEnd).size(38.dp)) {
+                Icon(if (favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Favorito", tint = if (favorite) Red else White)
+            }
+        }
+        Spacer(Modifier.height(9.dp))
+        Text(c.name, color = White, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(c.group, color = Color(0xFF9DACCB), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(6.dp))
     }
 }
 @Composable private fun ChannelRow(c: Channel, favorite: Boolean, play: () -> Unit, toggle: () -> Unit) {
