@@ -45,8 +45,8 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.util.UUID
 
-private val Back = Color(0xFF080B15)
-private val Surface = Color(0xFF151C2D)
+private val Back = Color(0xFF050508)
+private val Surface = Color(0xFF121217)
 private val Gold = Color(0xFFFFCD35)
 private val Red = Color(0xFFFF3158)
 private val Blue = Color(0xFF447BFF)
@@ -84,6 +84,7 @@ private fun TmcApp(activity: MainActivity) {
     var sourceName by remember { mutableStateOf(prefs.getString("source_name", "Mi lista") ?: "Mi lista") }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showExitConfirmation by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
     var editingChannel by remember { mutableStateOf<Channel?>(null) }
     var editName by remember { mutableStateOf("") }
     var editGroup by remember { mutableStateOf("") }
@@ -146,16 +147,29 @@ private fun TmcApp(activity: MainActivity) {
         if (screen == "Inicio") showExitConfirmation = true
         else screen = if (screen == "Reproductor") previousScreen.takeUnless { it == "Reproductor" } ?: "TV en vivo" else "Inicio"
     }
-    BackHandler { navigateBack() }
+    BackHandler { if (showMenu) showMenu = false else navigateBack() }
     Column(Modifier.fillMaxSize().background(Back)) {
-        TmcHeader(screen, onBack = { navigateBack() })
+        TmcHeader(screen, onBack = { navigateBack() }, onMenu = { showMenu = true }, onSearch = { screen = "Explorar" })
         Box(Modifier.weight(1f)) {
             when (screen) {
                 "Inicio" -> LazyColumn(contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
-                        Text("BIENVENIDO A TMCVIDEOS", color = Color(0xFF8FA4C9), fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 2.sp)
+                        Text("TMCVIDEOS · TU ENTRETENIMIENTO", color = Gold, fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 1.sp)
                         Spacer(Modifier.height(5.dp))
-                        Text("El entretenimiento empieza aquí.", color = White, fontWeight = FontWeight.Black, fontSize = 26.sp, lineHeight = 31.sp)
+                        Text("Todo en videos, en un solo lugar", color = White, fontWeight = FontWeight.Black, fontSize = 24.sp, lineHeight = 29.sp)
+                        Spacer(Modifier.height(13.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(listOf("Inicio", "Películas", "Series", "Videos", "Deportes", "Música")) { tab ->
+                                val active = tab == "Inicio"
+                                Column(Modifier.width(90.dp).background(if (active) Red else Color(0xFF1C1C24), RoundedCornerShape(12.dp))
+                                    .clickable { when (tab) { "Inicio" -> screen = "Inicio"; "Videos" -> screen = "Videos"; else -> { categoryFilter = tab; screen = "TV en vivo" } } }
+                                    .padding(vertical = 13.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(when(tab) { "Inicio" -> Icons.Default.Home; "Películas" -> Icons.Default.Movie; "Series" -> Icons.Default.Tv; "Videos" -> Icons.Default.PlayCircle; "Deportes" -> Icons.Default.SportsSoccer; else -> Icons.Default.MusicNote }, null, tint = White)
+                                    Spacer(Modifier.height(5.dp))
+                                    Text(tab, color = White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(14.dp))
                         HeroCard { categoryFilter = "Todos"; searching = ""; screen = "TV en vivo" }
                         Spacer(Modifier.height(12.dp))
@@ -370,6 +384,22 @@ private fun TmcApp(activity: MainActivity) {
                     Text("TMCVIDEOS · Versión 2.0 · Media3", color = Color.Gray, fontSize = 12.sp)
                 }
             }
+            if (showMenu) AlertDialog(
+                onDismissRequest = { showMenu = false },
+                title = { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PlayCircle, null, tint = Red); Spacer(Modifier.width(8.dp)); Text("TMCVIDEOS") } },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        listOf("Inicio", "Explorar", "TV en vivo", "Videos", "Favoritos", "Historial", "Listas M3U", "Ajustes").forEach { destination ->
+                            Row(Modifier.fillMaxWidth().clickable { showMenu = false; screen = destination }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(when(destination) { "Inicio" -> Icons.Default.Home; "Explorar" -> Icons.Default.Explore; "TV en vivo" -> Icons.Default.LiveTv; "Videos" -> Icons.Default.VideoLibrary; "Favoritos" -> Icons.Default.Favorite; "Historial" -> Icons.Default.History; "Listas M3U" -> Icons.Default.PlaylistPlay; else -> Icons.Default.Settings }, null, tint = if (screen == destination) Red else White)
+                                Spacer(Modifier.width(12.dp))
+                                Text(destination, color = White)
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showMenu = false }) { Text("Cerrar") } }
+            )
             if (showExitConfirmation) AlertDialog(
                 onDismissRequest = { showExitConfirmation = false },
                 title = { Text("Salir de TMCVIDEOS") },
@@ -410,41 +440,19 @@ private fun TmcApp(activity: MainActivity) {
     }
 }
 
-@Composable private fun TmcHeader(screen: String, onBack: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().background(Color(0xFF0E1322))
-            .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (screen != "Inicio") {
-            IconButton(onClick = onBack, modifier = Modifier.size(38.dp)) {
-                Icon(Icons.Default.ArrowBack, "Volver", tint = White)
-            }
-            Spacer(Modifier.width(5.dp))
+@Composable private fun TmcHeader(screen: String, onBack: () -> Unit, onMenu: () -> Unit, onSearch: () -> Unit) {
+    Row(Modifier.fillMaxWidth().background(Color.Black).padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = if (screen == "Inicio") onMenu else onBack) {
+            Icon(if (screen == "Inicio") Icons.Default.Menu else Icons.Default.ArrowBack, if (screen == "Inicio") "Menú" else "Volver", tint = White)
         }
-        // Identidad tipográfica provisional hasta incorporar el archivo del logo original.
-        Box(
-            Modifier.size(38.dp).border(1.dp, Red.copy(alpha = .65f), RoundedCornerShape(12.dp))
-                .background(Color(0xFF261527), RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("T", color = White, fontSize = 25.sp, fontWeight = FontWeight.Black)
+        Box(Modifier.size(34.dp).background(Brush.linearGradient(listOf(Gold, Red)), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.PlayArrow, "TMCVIDEOS", tint = White, modifier = Modifier.size(26.dp))
         }
-        Spacer(Modifier.width(10.dp))
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("TMC", color = White, fontSize = 21.sp, fontWeight = FontWeight.Black)
-                Text("VIDEOS", color = Red, fontSize = 21.sp, fontWeight = FontWeight.Black)
-            }
-            Text("STREAMING HUB", color = Color(0xFF99A4BF), fontSize = 9.sp, letterSpacing = 1.5.sp)
-        }
+        Spacer(Modifier.width(8.dp))
+        Text("TMC", color = White, fontWeight = FontWeight.Black, fontSize = 22.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+        Text("VIDEOS", color = Red, fontWeight = FontWeight.Black, fontSize = 22.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
         Spacer(Modifier.weight(1f))
-        if (screen == "Inicio") {
-            Box(Modifier.background(Color(0xFF172B27), RoundedCornerShape(30.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp)) {
-                Text("● EN VIVO", color = Color(0xFF62E6B1), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            }
-        }
+        IconButton(onClick = onSearch) { Icon(Icons.Default.Search, "Buscar", tint = White) }
     }
 }
 @Composable private fun SectionTitle(s: String) {
