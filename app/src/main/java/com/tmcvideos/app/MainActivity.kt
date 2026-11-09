@@ -191,12 +191,12 @@ private fun TmcApp(activity: MainActivity) {
                         Text("Todo en videos, en un solo lugar", color = White, fontWeight = FontWeight.Black, fontSize = 24.sp, lineHeight = 29.sp)
                         Spacer(Modifier.height(13.dp))
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(listOf("Inicio", "Películas", "Series", "Videos", "Deportes", "Música")) { tab ->
+                            items(listOf("Inicio", "TV en vivo", "Videos", "Listas M3U", "Más")) { tab ->
                                 val active = tab == "Inicio"
                                 Column(Modifier.width(90.dp).background(if (active) Red else Color(0xFF1C1C24), RoundedCornerShape(12.dp))
-                                    .clickable { when (tab) { "Inicio" -> screen = "Inicio"; "Videos" -> screen = "Videos"; else -> { categoryFilter = tab; screen = "TV en vivo" } } }
+                                    .clickable { when (tab) { "Inicio" -> screen = "Inicio"; "TV en vivo" -> { categoryFilter = "Todos"; screen = "TV en vivo" }; "Videos" -> screen = "Videos"; "Listas M3U" -> screen = "Listas M3U"; else -> showMenu = true } }
                                     .padding(vertical = 13.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(when(tab) { "Inicio" -> Icons.Default.Home; "Películas" -> Icons.Default.Movie; "Series" -> Icons.Default.Tv; "Videos" -> Icons.Default.PlayCircle; "Deportes" -> Icons.Default.SportsSoccer; else -> Icons.Default.MusicNote }, null, tint = White)
+                                    Icon(when(tab) { "Inicio" -> Icons.Default.Home; "TV en vivo" -> Icons.Default.LiveTv; "Videos" -> Icons.Default.VideoLibrary; "Listas M3U" -> Icons.Default.PlaylistPlay; else -> Icons.Default.MoreHoriz }, null, tint = White)
                                     Spacer(Modifier.height(5.dp))
                                     Text(tab, color = White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
@@ -205,6 +205,14 @@ private fun TmcApp(activity: MainActivity) {
                         Spacer(Modifier.height(14.dp))
                         HeroCard { categoryFilter = "Todos"; searching = ""; screen = "TV en vivo" }
                         Spacer(Modifier.height(12.dp))
+                        Text("Accesos Rápidos", color = White, fontWeight = FontWeight.Black, fontSize = 20.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            QuickAccess("TV en vivo", Icons.Default.LiveTv, Color(0xFF7025DB), Modifier.weight(1f)) { categoryFilter = "Todos"; screen = "TV en vivo" }
+                            QuickAccess("Videos", Icons.Default.VideoLibrary, Blue, Modifier.weight(1f)) { screen = "Videos" }
+                            QuickAccess("Mis Videos", Icons.Default.Folder, Color(0xFF00A54B), Modifier.weight(1f)) { screen = "Videos" }
+                            QuickAccess("Favoritos", Icons.Default.Star, Color(0xFFE87805), Modifier.weight(1f)) { screen = "Favoritos" }
+                        }
                         Spacer(Modifier.height(12.dp))
                         NeonCard {
                             Row(Modifier.fillMaxWidth().clickable { screen = "Listas M3U" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -220,7 +228,7 @@ private fun TmcApp(activity: MainActivity) {
                             }
                         }
                         Spacer(Modifier.height(16.dp))
-                        Text("Explora géneros", color = White, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                        Text("Categorías", color = White, fontSize = 21.sp, fontWeight = FontWeight.Black)
                         Spacer(Modifier.height(11.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             GenreCard("DEPORTES", "En acción", Icons.Default.SportsSoccer, Color(0xFF126A66), Modifier.weight(1f)) { categoryFilter = "Deportes"; searching = ""; screen = "TV en vivo" }
@@ -310,6 +318,8 @@ private fun TmcApp(activity: MainActivity) {
                             (c.name.contains(searching, true) || c.group.contains(searching, true))
                     }
                     Column(Modifier.fillMaxSize().padding(14.dp)) {
+                        Text(when (screen) { "TV en vivo" -> "▣  TV en Vivo"; "Favoritos" -> "♡  Favoritos"; "Historial" -> "◷  Historial"; else -> "Explorar" }, color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(10.dp))
                         if (screen == "TV en vivo" || screen == "Explorar") {
                             OutlinedTextField(searching, { searching = it }, label = { Text("Buscar canales") }, singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.fillMaxWidth())
                             Spacer(Modifier.height(12.dp))
@@ -337,7 +347,7 @@ private fun TmcApp(activity: MainActivity) {
                     }
                 }
                 "Listas M3U" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionTitle("Mis listas de reproducción")
+                    SectionTitle("▤  Listas M3U")
                     Text("Añade tus propias listas M3U/M3U8 autorizadas para ver los canales.", color = Color.LightGray, fontSize = 13.sp)
                     NeonCard { Row(Modifier.fillMaxWidth().clickable(enabled = !busy && libraryLoaded) { importFile.launch("*/*") }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.FileOpen, null, tint = Blue); Spacer(Modifier.width(12.dp)); Text("Importar archivo .m3u / .m3u8", color = White) } }
                     OutlinedTextField(urlInput, { urlInput = it }, label = { Text("URL de lista M3U (HTTP o HTTPS)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
@@ -387,7 +397,7 @@ private fun TmcApp(activity: MainActivity) {
                 }
                 "Reproductor" -> selected?.let { c -> PlayerScreen(c, autoplay, diagnostics) { toggleFavorite(c) } }
                 "Ajustes" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionTitle("Configuración")
+                    SectionTitle("⚙  Configuración")
                     Text("Preferencias de reproducción", color = Gold, fontWeight = FontWeight.Bold)
                     NeonCard {
                         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -477,7 +487,7 @@ private fun TmcApp(activity: MainActivity) {
             if (message.isNotBlank()) AlertDialog(onDismissRequest = { message = "" }, title = { Text("TMCVIDEOS") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { message = "" }) { Text("Aceptar") } })
         }
         NavigationBar(containerColor = Color.Black, tonalElevation = 0.dp) {
-            listOf(Triple("Inicio", Icons.Default.Home, "Inicio"), Triple("TV", Icons.Default.LiveTv, "TV en vivo"), Triple("Listas", Icons.Default.PlaylistAdd, "Listas M3U"), Triple("Favoritos", Icons.Default.FavoriteBorder, "Favoritos"), Triple("Ajustes", Icons.Default.Settings, "Ajustes")).forEach { (label, icon, target) ->
+            listOf(Triple("Inicio", Icons.Default.Home, "Inicio"), Triple("Explorar", Icons.Default.Explore, "Explorar"), Triple("TV", Icons.Default.PlayCircle, "TV en vivo"), Triple("Favoritos", Icons.Default.FavoriteBorder, "Favoritos"), Triple("Ajustes", Icons.Default.Settings, "Ajustes")).forEach { (label, icon, target) ->
                 NavigationBarItem(selected = screen == target, onClick = { if (target == "TV en vivo") { categoryFilter = "Todos"; searching = "" }; if (target == "Favoritos") searching = ""; screen = target }, icon = { Icon(icon, label) }, label = { Text(label, fontSize = 10.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Red, selectedTextColor = Red, unselectedIconColor = White, unselectedTextColor = White))
             }
         }
@@ -501,6 +511,13 @@ private fun TmcApp(activity: MainActivity) {
         Text("VIDEOS", color = Red, fontWeight = FontWeight.Black, fontSize = 22.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onSearch) { Icon(Icons.Default.Search, "Buscar", tint = White) }
+    }
+}
+@Composable private fun QuickAccess(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(modifier.background(tint, RoundedCornerShape(12.dp)).clickable { onClick() }.padding(horizontal = 3.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Icon(icon, null, tint = White, modifier = Modifier.size(29.dp))
+        Text(label, color = White, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 @Composable private fun SectionTitle(s: String) {
