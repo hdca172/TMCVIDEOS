@@ -40,11 +40,11 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.util.UUID
 
-private val Back = Color(0xFF050712)
-private val Surface = Color(0xFF12192D)
+private val Back = Color(0xFF080B15)
+private val Surface = Color(0xFF151C2D)
 private val Gold = Color(0xFFFFCD35)
-private val Red = Color(0xFFF10834)
-private val Blue = Color(0xFF2675FF)
+private val Red = Color(0xFFFF3158)
+private val Blue = Color(0xFF447BFF)
 private val Purple = Color(0xFF9E3DFF)
 private val White = Color(0xFFF5F7FF)
 
@@ -116,7 +116,17 @@ private fun TmcApp(activity: MainActivity) {
             when (screen) {
                 "Inicio" -> LazyColumn(contentPadding = PaddingValues(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
-                        HeroCard { screen = "TV en vivo" }
+                        Text("TU ENTRETENIMIENTO", color = Gold, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 2.sp)
+                        Spacer(Modifier.height(5.dp))
+                        Text("Todo en un solo lugar.", color = White, fontWeight = FontWeight.Black, fontSize = 25.sp)
+                        Spacer(Modifier.height(14.dp))
+                        HeroCard { categoryFilter = "Todos"; searching = ""; screen = "TV en vivo" }
+                        Spacer(Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            MetricCard("${channels.size}", "CANALES", Icons.Default.LiveTv, Modifier.weight(1f))
+                            MetricCard("${favorites.size}", "FAVORITOS", Icons.Default.Favorite, Modifier.weight(1f))
+                            MetricCard("${history.size}", "RECIENTES", Icons.Default.History, Modifier.weight(1f))
+                        }
                         Spacer(Modifier.height(12.dp))
                         NeonCard {
                             Row(Modifier.fillMaxWidth().clickable { screen = "Listas M3U" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -125,8 +135,8 @@ private fun TmcApp(activity: MainActivity) {
                                 }
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text("Agregar lista M3U", color = White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                                    Text("Importa desde archivo o enlace HTTP/HTTPS", color = Color.LightGray, fontSize = 12.sp)
+                                    Text("Mis listas M3U", color = White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                                    Text(if (channels.isEmpty()) "Añade tu primera lista de canales" else "${channels.size} canales · Importar o administrar", color = Color.LightGray, fontSize = 12.sp)
                                 }
                                 Icon(Icons.Default.ChevronRight, null, tint = Gold)
                             }
@@ -241,7 +251,7 @@ private fun TmcApp(activity: MainActivity) {
             if (showDeleteConfirmation) AlertDialog(onDismissRequest = { showDeleteConfirmation = false }, title = { Text("Eliminar canales") }, text = { Text("Se eliminarán los canales importados de este dispositivo. ¿Continuar?") }, confirmButton = { TextButton(onClick = { savePlaylist(emptyList()); showDeleteConfirmation = false; message = "Canales eliminados" }) { Text("Eliminar") } }, dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancelar") } })
             if (message.isNotBlank()) AlertDialog(onDismissRequest = { message = "" }, title = { Text("TMCVIDEOS") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { message = "" }) { Text("Aceptar") } })
         }
-        NavigationBar(containerColor = Color(0xFF090F21)) {
+        NavigationBar(containerColor = Color(0xFF111728), tonalElevation = 0.dp) {
             listOf(Triple("Inicio", Icons.Default.Home, "Inicio"), Triple("TV", Icons.Default.LiveTv, "TV en vivo"), Triple("Listas", Icons.Default.PlaylistAdd, "Listas M3U"), Triple("Favoritos", Icons.Default.FavoriteBorder, "Favoritos"), Triple("Ajustes", Icons.Default.Settings, "Ajustes")).forEach { (label, icon, target) ->
                 NavigationBarItem(selected = screen == target, onClick = { if (target == "TV en vivo") { categoryFilter = "Todos"; searching = "" }; if (target == "Favoritos") searching = ""; screen = target }, icon = { Icon(icon, label) }, label = { Text(label, fontSize = 10.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Red, selectedTextColor = Red, unselectedIconColor = White, unselectedTextColor = White))
             }
@@ -250,37 +260,113 @@ private fun TmcApp(activity: MainActivity) {
 }
 
 @Composable private fun TmcHeader(screen: String, onBack: () -> Unit) {
-    Row(Modifier.fillMaxWidth().background(Back).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) { Icon(if (screen == "Inicio") Icons.Default.Menu else Icons.Default.ArrowBack, null, tint = White) }
-        Spacer(Modifier.width(8.dp))
-        Box(Modifier.size(34.dp).border(1.dp, Gold, RoundedCornerShape(10.dp)).background(Brush.linearGradient(listOf(Red, Purple)), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.PlayArrow, "TMCVIDEOS", tint = White, modifier = Modifier.size(24.dp))
+    Row(
+        Modifier.fillMaxWidth().background(Color(0xFF0E1322))
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (screen != "Inicio") {
+            IconButton(onClick = onBack, modifier = Modifier.size(38.dp)) {
+                Icon(Icons.Default.ArrowBack, "Volver", tint = White)
+            }
+            Spacer(Modifier.width(5.dp))
         }
-        Spacer(Modifier.width(4.dp))
-        Text("TMC", color = White, fontSize = 23.sp, fontWeight = FontWeight.Black, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
-        Text("VIDEOS", color = Red, fontSize = 23.sp, fontWeight = FontWeight.Black, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+        // Identidad tipográfica provisional hasta incorporar el archivo del logo original.
+        Box(
+            Modifier.size(38.dp).border(1.dp, Red.copy(alpha = .65f), RoundedCornerShape(12.dp))
+                .background(Color(0xFF261527), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("T", color = White, fontSize = 25.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("TMC", color = White, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                Text("VIDEOS", color = Red, fontSize = 21.sp, fontWeight = FontWeight.Black)
+            }
+            Text("STREAMING HUB", color = Color(0xFF99A4BF), fontSize = 9.sp, letterSpacing = 1.5.sp)
+        }
         Spacer(Modifier.weight(1f))
-        Text(if (screen == "Inicio") "" else screen, color = Color.LightGray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-@Composable private fun SectionTitle(s: String) { Text(s, color = White, fontWeight = FontWeight.Bold, fontSize = 20.sp) }
-@Composable private fun NeonCard(content: @Composable () -> Unit) { Box(Modifier.fillMaxWidth().border(1.dp, Brush.horizontalGradient(listOf(Blue, Purple)), RoundedCornerShape(12.dp)).background(Surface, RoundedCornerShape(12.dp))) { content() } }
-@Composable private fun HeroCard(onClick: () -> Unit) {
-    Box(Modifier.fillMaxWidth().height(160.dp).border(1.dp, Blue, RoundedCornerShape(14.dp)).background(Brush.linearGradient(listOf(Color(0xFF071027), Color(0xFF064EA1), Purple)), RoundedCornerShape(14.dp)).clickable { onClick() }.padding(18.dp)) {
-        Column(Modifier.align(Alignment.BottomStart)) {
-            Text("EN VIVO", color = White, modifier = Modifier.background(Red, RoundedCornerShape(5.dp)).padding(horizontal = 8.dp, vertical = 3.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
-            Text("TV EN VIVO", color = White, fontWeight = FontWeight.Black, fontSize = 27.sp)
-            Text("Todos tus canales en un solo lugar", color = White, fontSize = 11.sp)
-            Spacer(Modifier.height(8.dp))
-            Text("EXPLORAR CANALES  ›", color = Gold, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        if (screen == "Inicio") {
+            Box(Modifier.background(Color(0xFF172B27), RoundedCornerShape(30.dp))
+                .padding(horizontal = 10.dp, vertical = 6.dp)) {
+                Text("● EN VIVO", color = Color(0xFF62E6B1), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
         }
-        Icon(Icons.Default.PlayCircle, null, tint = White, modifier = Modifier.align(Alignment.CenterEnd).size(50.dp))
     }
 }
-@Composable private fun QuickTile(label: String, color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.height(82.dp).background(Brush.verticalGradient(listOf(color, color.copy(alpha = .55f))), RoundedCornerShape(11.dp)).clickable { onClick() }.padding(5.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Icon(icon, null, tint = White, modifier = Modifier.size(27.dp)); Spacer(Modifier.height(5.dp)); Text(label, color = White, fontWeight = FontWeight.Bold, fontSize = 10.sp, maxLines = 2, lineHeight = 12.sp)
+@Composable private fun SectionTitle(s: String) {
+    Text(s, color = White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+}
+@Composable private fun NeonCard(content: @Composable () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().border(1.dp, Color(0xFF2A3550), RoundedCornerShape(16.dp))
+            .background(Surface, RoundedCornerShape(16.dp))
+    ) { content() }
+}
+@Composable private fun MetricCard(
+    value: String, label: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier.background(Color(0xFF161E31), RoundedCornerShape(13.dp))
+            .border(1.dp, Color(0xFF26334D), RoundedCornerShape(13.dp))
+            .padding(horizontal = 10.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Icon(icon, null, tint = Gold, modifier = Modifier.size(18.dp))
+        Text(value, color = White, fontWeight = FontWeight.Black, fontSize = 21.sp)
+        Text(label, color = Color(0xFF9FAAC0), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+    }
+}
+@Composable private fun HeroCard(onClick: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().height(190.dp)
+            .border(1.dp, Color(0xFF41558B), RoundedCornerShape(20.dp))
+            .background(
+                Brush.linearGradient(listOf(Color(0xFF112B60), Color(0xFF241E52), Color(0xFF5E193A))),
+                RoundedCornerShape(20.dp)
+            ).clickable { onClick() }.padding(20.dp)
+    ) {
+        Column(Modifier.align(Alignment.CenterStart).fillMaxWidth(.75f)) {
+            Text(
+                "● TRANSMISIONES EN DIRECTO", color = Color(0xFFB9FCE1),
+                fontSize = 10.sp, fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(10.dp))
+            Text("TV EN VIVO", color = White, fontWeight = FontWeight.Black, fontSize = 30.sp)
+            Text("Tus canales favoritos, siempre a mano.", color = Color(0xFFE1E5F3), fontSize = 12.sp)
+            Spacer(Modifier.height(17.dp))
+            Box(
+                Modifier.background(Red, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+            ) { Text("EXPLORAR CANALES  ›", color = White, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+        }
+        Box(
+            Modifier.align(Alignment.CenterEnd).size(66.dp)
+                .background(White.copy(alpha = .12f), RoundedCornerShape(50)),
+            contentAlignment = Alignment.Center
+        ) { Icon(Icons.Default.PlayArrow, null, tint = White, modifier = Modifier.size(43.dp)) }
+    }
+}
+@Composable private fun QuickTile(
+    label: String, color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier, onClick: () -> Unit
+) {
+    Column(
+        modifier.height(96.dp).background(Color(0xFF171F33), RoundedCornerShape(14.dp))
+            .border(1.dp, color.copy(alpha = .55f), RoundedCornerShape(14.dp))
+            .clickable { onClick() }.padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            Modifier.size(39.dp).background(color.copy(alpha = .23f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) { Icon(icon, null, tint = color, modifier = Modifier.size(25.dp)) }
+        Spacer(Modifier.height(8.dp))
+        Text(label, color = White, fontWeight = FontWeight.SemiBold, fontSize = 10.sp, maxLines = 2, lineHeight = 12.sp)
     }
 }
 @Composable private fun ChannelRow(c: Channel, favorite: Boolean, play: () -> Unit, toggle: () -> Unit) {
