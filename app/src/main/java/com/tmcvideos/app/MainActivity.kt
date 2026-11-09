@@ -23,6 +23,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
@@ -599,6 +601,7 @@ private fun TmcApp(activity: MainActivity) {
     var muted by remember(c.url) { mutableStateOf(false) }
     var trackInfo by remember(c.url) { mutableStateOf("Buscando formatos compatibles...") }
     var mp2Unsupported by remember(c.url) { mutableStateOf(false) }
+    var audioDetail by remember(c.url) { mutableStateOf("Aún no se detectan pistas") }
     var fullscreen by remember(c.url) { mutableStateOf(false) }
     var playerReady by remember(c.url) { mutableStateOf(false) }
     var isBuffering by remember(c.url) { mutableStateOf(false) }
@@ -612,6 +615,15 @@ private fun TmcApp(activity: MainActivity) {
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 val audioGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
                 trackInfo = audioGroups.flatMap { group -> (0 until group.length).map { index -> group.getTrackFormat(index).sampleMimeType ?: "Desconocido" } }.distinct().joinToString(", ").ifBlank { "Sin pistas de audio" }
+                audioDetail = audioGroups.flatMap { group -> (0 until group.length).map { index ->
+                    val format = group.getTrackFormat(index)
+                    val supported = group.isTrackSupported(index)
+                    "Pista " + (index + 1) + ": " + (format.sampleMimeType ?: "sin MIME") +
+                        " · códec: " + (format.codecs ?: "sin datos") +
+                        " · canales: " + format.channelCount +
+                        " · frecuencia: " + format.sampleRate + " Hz" +
+                        " · compatible: " + if (supported) "sí" else "no"
+                } }.joinToString("\n").ifBlank { "Sin pistas detectadas" }
                 mp2Unsupported = audioGroups.any { group -> (0 until group.length).any { index ->
                     val format = group.getTrackFormat(index)
                     val isMp2 = format.sampleMimeType == "audio/mpeg-L2" || format.codecs?.contains("mp2", ignoreCase = true) == true
@@ -663,6 +675,12 @@ private fun TmcApp(activity: MainActivity) {
             if (diagnostics) {
                 Text(audioStatus, color = Color.LightGray, fontSize = 12.sp)
                 Text("Formato de audio: " + trackInfo, color = Color(0xFF9DACCB), fontSize = 12.sp)
+                Text(audioDetail, color = Color(0xFF9DACCB), fontSize = 12.sp)
+                OutlinedButton(onClick = {
+                    val details = "TMCVIDEOS - Diagnóstico de audio\nCanal: " + c.name + "\n" + audioStatus + "\n" + audioDetail + "\nError: " + (playbackError ?: "ninguno")
+                    val send = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, details) }
+                    context.startActivity(Intent.createChooser(send, "Compartir diagnóstico"))
+                }) { Icon(Icons.Default.BugReport, null); Spacer(Modifier.width(6.dp)); Text("Compartir diagnóstico de audio") }
             }
             if (mp2Unsupported) Text("Audio MPEG Layer II (MP2) detectado: este dispositivo no dispone de un decodificador compatible en el reproductor integrado. Prueba un reproductor externo.", color = Gold, fontSize = 13.sp)
             OutlinedButton(onClick = {
