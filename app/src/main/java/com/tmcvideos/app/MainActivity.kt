@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
@@ -61,13 +63,14 @@ private fun TmcApp(activity: MainActivity) {
     var selected by remember { mutableStateOf<Channel?>(null) }
     var urlInput by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf("") }
+    var categoryFilter by remember { mutableStateOf("Todos") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var sourceName by remember { mutableStateOf(prefs.getString("source_name", "Mi lista") ?: "Mi lista") }
     val favorites = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("favorites", "") ?: "").split("\n").filter(String::isNotBlank)) } }
     val history = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("history", "") ?: "").split("\n").filter(String::isNotBlank)) } }
     fun savePlaylist(list: List<Channel>) {
-        channels = list
+        channels = list.distinctBy { it.url }
         prefs.edit().putString("playlist", exportM3u(list)).apply()
     }
     fun play(c: Channel) {
@@ -123,10 +126,10 @@ private fun TmcApp(activity: MainActivity) {
                         SectionTitle("Categorías")
                         Spacer(Modifier.height(9.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            QuickTile("Deportes", Color(0xFF159445), Icons.Default.SportsSoccer, Modifier.weight(1f)) { screen = "TV en vivo" }
-                            QuickTile("Noticias", Blue, Icons.Default.Newspaper, Modifier.weight(1f)) { screen = "TV en vivo" }
-                            QuickTile("Música", Color(0xFF6C20C9), Icons.Default.MusicNote, Modifier.weight(1f)) { screen = "TV en vivo" }
-                            QuickTile("Infantil", Color(0xFFDF6906), Icons.Default.ChildCare, Modifier.weight(1f)) { screen = "TV en vivo" }
+                            QuickTile("Deportes", Color(0xFF159445), Icons.Default.SportsSoccer, Modifier.weight(1f)) { categoryFilter = "Deportes"; screen = "TV en vivo" }
+                            QuickTile("Noticias", Blue, Icons.Default.Newspaper, Modifier.weight(1f)) { categoryFilter = "Noticias"; screen = "TV en vivo" }
+                            QuickTile("Música", Color(0xFF6C20C9), Icons.Default.MusicNote, Modifier.weight(1f)) { categoryFilter = "Música"; screen = "TV en vivo" }
+                            QuickTile("Infantil", Color(0xFFDF6906), Icons.Default.ChildCare, Modifier.weight(1f)) { categoryFilter = "Infantil"; screen = "TV en vivo" }
                         }
                         Spacer(Modifier.height(18.dp))
                         SectionTitle("Últimos agregados")
@@ -137,14 +140,25 @@ private fun TmcApp(activity: MainActivity) {
                 "TV en vivo", "Explorar", "Favoritos", "Historial" -> {
                     val list = when (screen) {
                         "Favoritos" -> channels.filter { it.url in favorites }
-                        "Historial" -> history.mapNotNull { id -> channels.find { it.url == id } }
+                        "Historial" -> history.map { id -> channels.find { it.url == id } ?: Channel(if (id.startsWith("content://")) "Video local" else "Video reproducido", id, "Historial") }
                         else -> channels
                     }
-                    val shown = list.filter { it.name.contains(searching, true) || it.group.contains(searching, true) }
+                    val shown = list.filter { c ->
+                        (screen != "TV en vivo" || categoryFilter == "Todos" || c.group.contains(categoryFilter, true)) &&
+                            (c.name.contains(searching, true) || c.group.contains(searching, true))
+                    }
                     Column(Modifier.fillMaxSize().padding(14.dp)) {
                         if (screen == "TV en vivo" || screen == "Explorar") {
                             OutlinedTextField(searching, { searching = it }, label = { Text("Buscar canales") }, singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.fillMaxWidth())
                             Spacer(Modifier.height(12.dp))
+                            if (screen == "TV en vivo") {
+                                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    (listOf("Todos") + channels.map { it.group }.distinct().sorted()).forEach { group ->
+                                        FilterChip(selected = categoryFilter == group, onClick = { categoryFilter = group }, label = { Text(group) })
+                                    }
+                                }
+                                Spacer(Modifier.height(8.dp))
+                            }
                         }
                         if (shown.isEmpty()) EmptyState("No hay canales aquí. Importa tu primera lista M3U.")
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -186,7 +200,9 @@ private fun TmcApp(activity: MainActivity) {
                 "Reproductor" -> selected?.let { c -> PlayerScreen(c) { toggleFavorite(c) } }
                 "Ajustes" -> Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionTitle("Configuración")
-                    listOf("Reproductor" to "Media3 ExoPlayer", "Calidad de video" to "Automática según fuente", "Tema" to "Oscuro neón", "Idioma" to "Español", "Mis listas" to "${channels.size} canales", "Acerca de" to "TMCVIDEOS V1.0").forEach { (a,b) -> NeonCard { Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(a, color = White); Text(b, color = Color.LightGray, fontSize = 12.sp) } } }
+                    listOf("Reproductor" to "Media3 ExoPlayer", "Calidad de video" to "Automática según fuente", "Tema" to "Oscuro neón", "Idioma" to "Español", "Mis listas" to "${channels.size} canales", "Acerca de" to "TMCVIDEOS V2.0").forEach { (a,b) -> NeonCard { Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(a, color = White); Text(b, color = Color.LightGray, fontSize = 12.sp) } } }
+                    OutlinedButton(onClick = { history.clear(); prefs.edit().remove("history").apply(); message = "Historial eliminado" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar historial") }
+                    OutlinedButton(onClick = { favorites.clear(); prefs.edit().remove("favorites").apply(); message = "Favoritos eliminados" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar favoritos") }
                 }
             }
             if (message.isNotBlank()) AlertDialog(onDismissRequest = { message = "" }, title = { Text("TMCVIDEOS") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { message = "" }) { Text("Aceptar") } })
@@ -247,13 +263,22 @@ private fun TmcApp(activity: MainActivity) {
 
 @Composable private fun PlayerScreen(c: Channel, toggle: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val player = remember(c.url) { ExoPlayer.Builder(context).build().apply { setMediaItem(MediaItem.fromUri(Uri.parse(c.url))); prepare(); playWhenReady = true } }
+    var playbackError by remember(c.url) { mutableStateOf<String?>(null) }
+    val player = remember(c.url) { ExoPlayer.Builder(context).build().apply {
+        addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                playbackError = "No se pudo reproducir este contenido. Revisa el enlace, los permisos o el formato."
+            }
+        })
+        setMediaItem(MediaItem.fromUri(Uri.parse(c.url))); prepare(); playWhenReady = true
+    } }
     DisposableEffect(player) { onDispose { player.release() } }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         AndroidView(factory = { ctx -> PlayerView(ctx).apply { this.player = player; useController = true } }, modifier = Modifier.fillMaxWidth().height(240.dp))
         Column(Modifier.padding(16.dp)) {
             Text(c.name, color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp)); Text(c.group, color = Color.LightGray)
+            if (playbackError != null) Text(playbackError!!, color = Red, fontSize = 13.sp)
             Spacer(Modifier.height(16.dp))
             NeonCard { Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 IconButton(onClick = toggle) { Icon(Icons.Default.FavoriteBorder, "Favorito", tint = Red) }
