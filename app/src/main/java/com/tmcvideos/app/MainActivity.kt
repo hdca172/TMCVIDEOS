@@ -479,8 +479,12 @@ private fun TmcApp(activity: MainActivity) {
         IconButton(onClick = if (screen == "Inicio") onMenu else onBack) {
             Icon(if (screen == "Inicio") Icons.Default.Menu else Icons.Default.ArrowBack, if (screen == "Inicio") "Menú" else "Volver", tint = White)
         }
-        Box(Modifier.size(34.dp).background(Brush.linearGradient(listOf(Gold, Red)), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.PlayArrow, "TMCVIDEOS", tint = White, modifier = Modifier.size(26.dp))
+        Box(Modifier.size(45.dp), contentAlignment = Alignment.BottomCenter) {
+            Canvas(Modifier.size(38.dp).align(Alignment.BottomCenter)) {
+                drawCircle(brush = Brush.sweepGradient(listOf(Red, Gold, Red, Color(0xFF9B001E), Red)), style = Stroke(width = 6.dp.toPx()))
+            }
+            Icon(Icons.Default.PlayArrow, "TMCVIDEOS", tint = White, modifier = Modifier.align(Alignment.BottomCenter).size(32.dp))
+            Text("♛", color = Gold, fontSize = 20.sp, modifier = Modifier.align(Alignment.TopCenter).offset(y = (-12).dp))
         }
         Spacer(Modifier.width(8.dp))
         Text("TMC", color = White, fontWeight = FontWeight.Black, fontSize = 22.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
