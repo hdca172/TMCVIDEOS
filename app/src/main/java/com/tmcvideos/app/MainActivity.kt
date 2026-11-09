@@ -37,6 +37,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URL
 import java.net.HttpURLConnection
@@ -75,6 +76,9 @@ private fun TmcApp(activity: MainActivity) {
     var message by remember { mutableStateOf("") }
     var sourceName by remember { mutableStateOf(prefs.getString("source_name", "Mi lista") ?: "Mi lista") }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    var autoplay by remember { mutableStateOf(prefs.getBoolean("autoplay", true)) }
+    var diagnostics by remember { mutableStateOf(prefs.getBoolean("diagnostics", true)) }
     val favorites = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("favorites", "") ?: "").split("\n").filter(String::isNotBlank)) } }
     val history = remember { mutableStateListOf<String>().also { it.addAll((prefs.getString("history", "") ?: "").split("\n").filter(String::isNotBlank)) } }
     fun savePlaylist(list: List<Channel>) {
@@ -97,10 +101,19 @@ private fun TmcApp(activity: MainActivity) {
     val importFile = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             try {
-                val content = activity.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
-                val parsed = readChannels(content)
-                if (parsed.isEmpty()) message = "No se encontraron canales compatibles."
-                else { savePlaylist(channels + parsed); message = "Importados ${parsed.size} canales" }
+                scope.launch {
+                    busy = true
+                    try {
+                        val parsed = withContext(Dispatchers.IO) {
+                            val content = activity.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
+                            require(content.length <= 10_000_000) { "Archivo demasiado grande" }
+                            readChannels(content)
+                        }
+                        if (parsed.isEmpty()) message = "No se encontraron canales compatibles."
+                        else { savePlaylist(channels + parsed); message = "Importados ${parsed.size} canales" }
+                    } catch (e: Exception) { message = "Error al importar: ${e.localizedMessage}" }
+                    finally { busy = false }
+                }
             } catch (e: Exception) { message = "No se pudo leer el archivo: ${e.localizedMessage}" }
         }
     }
@@ -288,16 +301,35 @@ private fun TmcApp(activity: MainActivity) {
                     Button(onClick = { if (isWebUrl(urlInput.trim())) play(Channel("Video de Internet", urlInput.trim(), "Videos")) else message = "Usa una URL HTTP o HTTPS válida" }, modifier = Modifier.fillMaxWidth()) { Text("Reproducir enlace") }
                     Text("Los archivos elegidos se reproducen localmente. Usa solo enlaces y contenido autorizados.", color = Color.Gray, fontSize = 12.sp)
                 }
-                "Reproductor" -> selected?.let { c -> PlayerScreen(c) { toggleFavorite(c) } }
-                "Ajustes" -> Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                "Reproductor" -> selected?.let { c -> PlayerScreen(c, autoplay, diagnostics) { toggleFavorite(c) } }
+                "Ajustes" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionTitle("Configuración")
-                    listOf("Reproductor" to "Media3 ExoPlayer", "Calidad" to "Depende de la fuente", "Tema" to "Oscuro neón", "Idioma" to "Español", "Versión" to "TMCVIDEOS V2.0").forEach { (a,b) -> NeonCard { Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(a, color = White); Text(b, color = Color.LightGray, fontSize = 12.sp) } } }
-                    Text("Información de la aplicación. Estas opciones todavía no son ajustables.", color = Color.LightGray, fontSize = 12.sp)
-                    Button(onClick = { screen = "Listas M3U" }, modifier = Modifier.fillMaxWidth()) { Text("Administrar listas M3U (${channels.size} canales)") }
-                    OutlinedButton(onClick = { searching = ""; screen = "Historial" }, modifier = Modifier.fillMaxWidth()) { Text("Ver historial (${history.size})") }
-                    OutlinedButton(onClick = { searching = ""; screen = "Favoritos" }, modifier = Modifier.fillMaxWidth()) { Text("Ver favoritos (${favorites.size})") }
+                    Text("Preferencias de reproducción", color = Gold, fontWeight = FontWeight.Bold)
+                    NeonCard {
+                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Reproducción automática", color = White)
+                                Text("Iniciar al abrir un canal", color = Color.LightGray, fontSize = 12.sp)
+                            }
+                            Switch(checked = autoplay, onCheckedChange = { autoplay = it; prefs.edit().putBoolean("autoplay", it).apply() })
+                        }
+                    }
+                    NeonCard {
+                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Diagnóstico de audio", color = White)
+                                Text("Mostrar estado de la pista", color = Color.LightGray, fontSize = 12.sp)
+                            }
+                            Switch(checked = diagnostics, onCheckedChange = { diagnostics = it; prefs.edit().putBoolean("diagnostics", it).apply() })
+                        }
+                    }
+                    Text("Biblioteca y datos", color = White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                    Button(onClick = { screen = "Listas M3U" }, modifier = Modifier.fillMaxWidth()) { Text("Administrar listas M3U") }
+                    OutlinedButton(onClick = { searching = ""; screen = "Historial" }, modifier = Modifier.fillMaxWidth()) { Text("Ver historial") }
+                    OutlinedButton(onClick = { searching = ""; screen = "Favoritos" }, modifier = Modifier.fillMaxWidth()) { Text("Ver favoritos") }
                     OutlinedButton(onClick = { history.clear(); prefs.edit().remove("history").apply(); message = "Historial eliminado" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar historial") }
                     OutlinedButton(onClick = { favorites.clear(); prefs.edit().remove("favorites").apply(); message = "Favoritos eliminados" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar favoritos") }
+                    Text("TMCVIDEOS · Versión 2.0 · Media3", color = Color.Gray, fontSize = 12.sp)
                 }
             }
             if (showDeleteConfirmation) AlertDialog(onDismissRequest = { showDeleteConfirmation = false }, title = { Text("Eliminar canales") }, text = { Text("Se eliminarán los canales importados de este dispositivo. ¿Continuar?") }, confirmButton = { TextButton(onClick = { savePlaylist(emptyList()); showDeleteConfirmation = false; message = "Canales eliminados" }) { Text("Eliminar") } }, dismissButton = { TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancelar") } })
@@ -452,7 +484,7 @@ private fun TmcApp(activity: MainActivity) {
 }
 @Composable private fun EmptyState(s: String) { Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.TvOff, null, tint = Purple, modifier = Modifier.size(45.dp)); Spacer(Modifier.height(8.dp)); Text(s, color = Color.LightGray, fontSize = 13.sp) } }
 
-@Composable private fun PlayerScreen(c: Channel, toggle: () -> Unit) {
+@Composable private fun PlayerScreen(c: Channel, autoplay: Boolean, diagnostics: Boolean, toggle: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var playbackError by remember(c.url) { mutableStateOf<String?>(null) }
     var audioStatus by remember(c.url) { mutableStateOf("Comprobando pista de audio...") }
@@ -474,7 +506,7 @@ private fun TmcApp(activity: MainActivity) {
                 playbackError = "Error de reproducción (${error.errorCodeName}): ${error.cause?.localizedMessage ?: error.localizedMessage ?: "origen o formato incompatible"}"
             }
         })
-        setMediaItem(MediaItem.fromUri(Uri.parse(c.url))); prepare(); playWhenReady = true
+        setMediaItem(MediaItem.fromUri(Uri.parse(c.url))); prepare(); playWhenReady = autoplay
     } }
     DisposableEffect(player) { onDispose { player.release() } }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -485,7 +517,7 @@ private fun TmcApp(activity: MainActivity) {
             if (playbackError != null) Text(playbackError!!, color = Red, fontSize = 13.sp)
             Spacer(Modifier.height(12.dp))
             Text("Audio", color = White, fontWeight = FontWeight.Bold)
-            Text(audioStatus, color = Color.LightGray, fontSize = 12.sp)
+            if (diagnostics) Text(audioStatus, color = Color.LightGray, fontSize = 12.sp)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { muted = !muted; player.volume = if (muted) volume else 0f }) {
                     Icon(if (muted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, if (muted) "Activar sonido" else "Silenciar", tint = White)
