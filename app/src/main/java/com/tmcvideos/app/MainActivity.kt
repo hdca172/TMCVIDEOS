@@ -443,7 +443,7 @@ private fun TmcApp(activity: MainActivity) {
                     OutlinedButton(onClick = { history.clear(); prefs.edit().remove("history").apply(); message = "Historial eliminado" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar historial") }
                     OutlinedButton(onClick = { favorites.clear(); prefs.edit().remove("favorites").apply(); message = "Favoritos eliminados" }, modifier = Modifier.fillMaxWidth()) { Text("Borrar favoritos") }
                     OutlinedButton(onClick = { screen = "Ayuda" }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.HelpOutline, null); Spacer(Modifier.width(8.dp)); Text("Ayuda") }
-                    OutlinedButton(onClick = { screen = "Acerca de" }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.InfoOutline, null); Spacer(Modifier.width(8.dp)); Text("Acerca de") }
+                    OutlinedButton(onClick = { screen = "Acerca de" }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Info, null); Spacer(Modifier.width(8.dp)); Text("Acerca de") }
                     Text("TMCVIDEOS · Versión 2.0 · Media3", color = Color.Gray, fontSize = 12.sp)
                 }
             }
@@ -464,7 +464,7 @@ private fun TmcApp(activity: MainActivity) {
                                 .background(if (active) Brush.horizontalGradient(listOf(Red, Color(0xFF36131B))) else Brush.horizontalGradient(listOf(Color(0xFF101015), Color(0xFF101015))))
                                 .clickable { showMenu = false; screen = destination }
                                 .padding(horizontal = 21.dp, vertical = 17.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(when(destination) { "Inicio" -> Icons.Default.Home; "Explorar" -> Icons.Default.Explore; "TV en vivo" -> Icons.Default.LiveTv; "Videos" -> Icons.Default.VideoLibrary; "Favoritos" -> Icons.Default.Favorite; "Historial" -> Icons.Default.History; "Listas M3U" -> Icons.Default.PlaylistPlay; "Ayuda" -> Icons.Default.HelpOutline; "Acerca de" -> Icons.Default.InfoOutline; else -> Icons.Default.Settings }, null, tint = White)
+                                Icon(when(destination) { "Inicio" -> Icons.Default.Home; "Explorar" -> Icons.Default.Explore; "TV en vivo" -> Icons.Default.LiveTv; "Videos" -> Icons.Default.VideoLibrary; "Favoritos" -> Icons.Default.Favorite; "Historial" -> Icons.Default.History; "Listas M3U" -> Icons.Default.PlaylistPlay; "Ayuda" -> Icons.Default.HelpOutline; "Acerca de" -> Icons.Default.Info; else -> Icons.Default.Settings }, null, tint = White)
                                 Spacer(Modifier.width(18.dp))
                                 Text(destination, color = White, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal, fontSize = 16.sp)
                             }
